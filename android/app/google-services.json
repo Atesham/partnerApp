@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "124131366432",
+    "project_id": "kabad-8fbc6",
+    "storage_bucket": "kabad-8fbc6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:124131366432:android:4cad1ad67d798e6c954e45",
+        "android_client_info": {
+          "package_name": "com.example.kabadi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBoR09zrnAksJOv_LrQ7hcEwH5R3xCJEM0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:124131366432:android:14982abc3aa5cc05954e45",
+        "android_client_info": {
+          "package_name": "come.android.kabad"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBoR09zrnAksJOv_LrQ7hcEwH5R3xCJEM0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
