@@ -78,9 +78,15 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: PopScope(
+        canPop: false,
+        onPopInvoked: (didPop) {
         if (didPop) return;
         _navigateBack();
       },
@@ -129,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'ScrapDirect',
+                                'Scrapwell',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
@@ -260,8 +266,9 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildBenefits(BuildContext context) {
     final benefits = [

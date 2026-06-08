@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/partner_provider.dart';
 import '../../../core/widgets/shared_widgets.dart';
@@ -89,9 +90,14 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
   Widget build(BuildContext context) {
     final canGoBack = Navigator.canPop(context);
 
-    // No PopScope(canPop: false) anymore so device back button works naturally
-    return Scaffold(
-      backgroundColor: AppTheme.background,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnim,
@@ -181,8 +187,9 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildLangCard(_LangOption lang) {
     final isSelected = _selected == lang.code;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/l10n/app_localizations.dart';
@@ -62,9 +63,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final isLast = _page == _pages.length - 1;
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         if (_page > 0) {
           _controller.previousPage(
@@ -147,8 +154,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _OBPage extends StatelessWidget {

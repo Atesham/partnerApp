@@ -187,9 +187,11 @@ class _EarningsScreenState extends State<EarningsScreen> {
   }
 
   Widget _buildChartSection() {
-    // Simplified bar chart representation
-    final bars = [40.0, 70.0, 55.0, 90.0, 65.0, 80.0, 45.0];
-    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    // Show real performance metrics instead of dummy chart bars
+    final avgPerOrder = _earnings.weekOrders > 0
+        ? _earnings.weekEarnings / _earnings.weekOrders
+        : 0.0;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -199,40 +201,46 @@ class _EarningsScreenState extends State<EarningsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Weekly Trend', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-          const SizedBox(height: 20),
-          SizedBox(
-            height: 80,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(7, (i) {
-                final isToday = i == (DateTime.now().weekday - 1);
-                return Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    AnimatedContainer(
-                      duration: Duration(milliseconds: 400 + i * 80),
-                      width: 28,
-                      height: bars[i] * 0.8,
-                      decoration: BoxDecoration(
-                        color: isToday ? AppTheme.primary : AppTheme.primaryLight,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(days[i], style: TextStyle(
-                      fontSize: 10, fontWeight: FontWeight.w600,
-                      color: isToday ? AppTheme.primary : AppTheme.textHint)),
-                  ],
-                );
-              }),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Performance', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: AppTheme.primaryLight, borderRadius: BorderRadius.circular(10)),
+                child: const Text('This Week', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.w700)),
+              ),
+            ],
           ),
+          const SizedBox(height: 16),
+          _performanceRow(Icons.payments_rounded, 'Avg. Per Order',
+              '₹${avgPerOrder.toStringAsFixed(0)}', AppTheme.primary),
+          const Divider(height: 20, color: AppTheme.divider),
+          _performanceRow(Icons.inventory_2_rounded, 'Week Pickups',
+              '${_earnings.weekOrders} orders', AppTheme.info),
+          const Divider(height: 20, color: AppTheme.divider),
+          _performanceRow(Icons.account_balance_wallet_rounded, 'Week Earnings',
+              '₹${_earnings.weekEarnings.toStringAsFixed(0)}', AppTheme.success),
         ],
       ),
     );
   }
+
+  Widget _performanceRow(IconData icon, String label, String value, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary, fontWeight: FontWeight.w500))),
+        Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
+      ],
+    );
+  }
+
 
   Widget _buildWalletCard() {
     return Container(

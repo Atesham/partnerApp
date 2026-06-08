@@ -56,7 +56,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '124131366432',
     projectId: 'kabad-8fbc6',
     storageBucket: 'kabad-8fbc6.firebasestorage.app',
-    iosBundleId: 'com.scrapdirect.partner',
+    iosBundleId: 'com.scrapwell.partner',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -65,7 +65,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '124131366432',
     projectId: 'kabad-8fbc6',
     storageBucket: 'kabad-8fbc6.firebasestorage.app',
-    iosBundleId: 'com.scrapdirect.partner',
+    iosBundleId: 'com.scrapwell.partner',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

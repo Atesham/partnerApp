@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../firebase_options.dart';
 import '../../../core/providers/partner_provider.dart';
 import '../../language/presentation/language_selection_screen.dart';
 import '../../main/presentation/main_screen.dart';
@@ -56,27 +59,41 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigate() async {
-    await Future.delayed(const Duration(milliseconds: 2800));
+    // Run the minimum display time and auth check in parallel
+    final results = await Future.wait([
+      Future.delayed(const Duration(milliseconds: 1400)),
+      _checkAuthStatus(),
+    ]);
+
     if (!mounted) return;
+
+    final route = results[1] as Widget;
+    _push(route);
+  }
+
+  Future<Widget> _checkAuthStatus() async {
+    // Initialize Firebase in the background (during animation)
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    // Load saved locale
+    await initLocale();
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _push(const LanguageSelectionScreen());
-      return;
+      return const LanguageSelectionScreen();
     }
 
     final partner = PartnerProvider();
     await partner.loadPartner();
 
-    if (!mounted) return;
-
     if (!partner.hasProfile) {
-      _push(const RegistrationScreen());
+      return const RegistrationScreen();
     } else if (partner.isApproved) {
       partner.listenToPartner();
-      _push(const MainScreen());
+      return const MainScreen();
     } else {
-      _push(const PendingApprovalScreen());
+      return const PendingApprovalScreen();
     }
   }
 
@@ -94,8 +111,14 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -189,7 +212,7 @@ class _SplashScreenState extends State<SplashScreen>
                       child: Column(
                         children: [
                           const Text(
-                            'ScrapDirect',
+                            'Scrapwell',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 34,
@@ -254,7 +277,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'kabad-8fbc6 · Powered by Firebase',
+                      'Powered by Scrapwell',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.4),
                         fontSize: 11,
@@ -268,6 +291,7 @@ class _SplashScreenState extends State<SplashScreen>
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

@@ -1,5 +1,1 @@
-package com.scrapdirect.scrapdirect_partner
-
-import io.flutter.embedding.android.FlutterActivity
-
-class MainActivity : FlutterActivity()
+// Deleted - Package migrated to com.scrapwell.partner

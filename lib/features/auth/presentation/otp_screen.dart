@@ -219,38 +219,45 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: Column(
-        children: [
-          // ── Decorative Header ─────────────────────────────────────
-          _buildHeader(context),
-
-          // ── Content ───────────────────────────────────────────────
-          Expanded(
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: SlideTransition(
-                position: _slideAnim,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildTitleSection(context),
-                      const SizedBox(height: 36),
-                      _buildOtpSection(),
-                      const SizedBox(height: 28),
-                      _buildResendSection(context),
-                      const SizedBox(height: 32),
-                      _buildVerifyButton(context),
-                    ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: Column(
+          children: [
+            // ── Decorative Header ─────────────────────────────────────
+            _buildHeader(context),
+  
+            // ── Content ───────────────────────────────────────────────
+            Expanded(
+              child: FadeTransition(
+                opacity: _fadeAnim,
+                child: SlideTransition(
+                  position: _slideAnim,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildTitleSection(context),
+                        const SizedBox(height: 36),
+                        _buildOtpSection(),
+                        const SizedBox(height: 28),
+                        _buildResendSection(context),
+                        const SizedBox(height: 32),
+                        _buildVerifyButton(context),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

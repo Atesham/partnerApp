@@ -63,7 +63,7 @@ class LeadModel {
       assignedPartnerId: json['assignedPartnerId'],
       createdAt: (json['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       expiresAt: (json['expiresAt'] as Timestamp?)?.toDate() ??
-          DateTime.now().add(const Duration(seconds: 90)),
+          DateTime.now().add(const Duration(seconds: 120)),
     );
   }
 

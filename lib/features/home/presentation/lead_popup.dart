@@ -1,20 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/models/lead_model.dart';
+import '../../../core/models/order_model.dart';
 import '../../../core/models/partner_model.dart';
 import '../../../core/services/lead_service.dart';
 import '../../../core/widgets/shared_widgets.dart';
+import '../../../core/utils/location_utils.dart';
 import '../../orders/presentation/order_tracking_screen.dart';
 
 class LeadPopup extends StatefulWidget {
-  final LeadModel lead;
+  final OrderModel order;
   final PartnerModel partner;
   final VoidCallback onAccepted;
   final VoidCallback onDeclined;
 
   const LeadPopup({
-    super.key, required this.lead, required this.partner,
+    super.key, required this.order, required this.partner,
     required this.onAccepted, required this.onDeclined,
   });
 
@@ -29,9 +32,10 @@ class _LeadPopupState extends State<LeadPopup>
   late Animation<double> _fadeAnim;
 
   late Timer _timer;
-  int _secondsLeft = 30;
+  int _secondsLeft = 120;
   bool _isAccepting = false;
   bool _responded = false;
+  StreamSubscription<DocumentSnapshot>? _orderSub;
 
   @override
   void initState() {
@@ -43,7 +47,12 @@ class _LeadPopupState extends State<LeadPopup>
     _fadeAnim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
     _ctrl.forward();
 
-    _secondsLeft = widget.lead.secondsRemaining.clamp(0, 30);
+    final expires = widget.order.expiresAt;
+    if (expires != null) {
+      _secondsLeft = expires.difference(DateTime.now()).inSeconds.clamp(0, 120);
+    } else {
+      _secondsLeft = 120;
+    }
 
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
@@ -56,10 +65,36 @@ class _LeadPopupState extends State<LeadPopup>
         }
       });
     });
+
+    _listenToOrderStatus();
+  }
+
+  void _listenToOrderStatus() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    _orderSub = FirebaseFirestore.instance
+        .collection('orders')
+        .doc(widget.order.orderId)
+        .snapshots()
+        .listen((doc) {
+      if (!mounted) return;
+      if (doc.exists && doc.data() != null) {
+        final status = doc.data()?['status'];
+        final partnerId = doc.data()?['partnerId'];
+        if (status != 'searchingPartner' && partnerId != uid && !_responded) {
+          _responded = true;
+          _timer.cancel();
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+          AppTheme.showSnack(context, 'Order was accepted by another partner.', isError: true);
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    _orderSub?.cancel();
     _timer.cancel();
     _ctrl.dispose();
     super.dispose();
@@ -72,7 +107,7 @@ class _LeadPopupState extends State<LeadPopup>
 
     setState(() => _isAccepting = true);
 
-    final ok = await LeadService.instance.acceptLead(widget.lead, widget.partner);
+    final ok = await LeadService.instance.acceptOrder(widget.order, widget.partner);
 
     if (!mounted) return;
     setState(() => _isAccepting = false);
@@ -83,7 +118,7 @@ class _LeadPopupState extends State<LeadPopup>
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => OrderTrackingScreen(orderId: widget.lead.orderId),
+          builder: (_) => OrderTrackingScreen(orderId: widget.order.orderId),
         ),
       );
     } else {
@@ -106,10 +141,11 @@ class _LeadPopupState extends State<LeadPopup>
     Navigator.pop(context);
   }
 
-  double get _progress => _secondsLeft / 30.0;
+  double get _progress => _secondsLeft / 120.0;
 
   @override
   Widget build(BuildContext context) {
+    final scrapCategories = widget.order.scrapItems.map((e) => e.category).toList();
     return FadeTransition(
       opacity: _fadeAnim,
       child: Container(
@@ -168,33 +204,43 @@ class _LeadPopupState extends State<LeadPopup>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Location
-                      _detailRow(Icons.location_on_rounded, 'Location', widget.lead.customerAddress, AppTheme.error),
+                      _detailRow(Icons.location_on_rounded, 'Location', widget.order.customerAddress, AppTheme.error),
                       const SizedBox(height: 12),
                       // Distance
-                      _detailRow(Icons.social_distance_rounded, 'Distance', '~2.3 km from your shop', AppTheme.info),
+                      _detailRow(
+                        Icons.social_distance_rounded,
+                        'Distance',
+                        '~${LocationUtils.calculateDistance(
+                          widget.partner.currentLat != 0.0 ? widget.partner.currentLat : widget.partner.shopLat,
+                          widget.partner.currentLng != 0.0 ? widget.partner.currentLng : widget.partner.shopLng,
+                          widget.order.customerLat,
+                          widget.order.customerLng,
+                        ).toStringAsFixed(1)} km from your location',
+                        AppTheme.info,
+                      ),
                       const SizedBox(height: 12),
                       // Estimated value
-                      _detailRow(Icons.payments_rounded, 'Estimated Value', '₹${widget.lead.estimatedPayout.toStringAsFixed(0)}', AppTheme.primary),
+                      _detailRow(Icons.payments_rounded, 'Estimated Value', '₹${widget.order.estimatedPayout.toStringAsFixed(0)}', AppTheme.primary),
                       const SizedBox(height: 12),
                       // Weight
-                      _detailRow(Icons.scale_rounded, 'Approx Weight', '~${widget.lead.estimatedWeight.toStringAsFixed(0)} kg', AppTheme.warning),
+                      _detailRow(Icons.scale_rounded, 'Approx Weight', '~${widget.order.totalEstimatedWeight.toStringAsFixed(0)} kg', AppTheme.warning),
                       const SizedBox(height: 12),
                       // Slot
-                      _detailRow(Icons.schedule_rounded, 'Pickup Slot', widget.lead.pickupSlot, AppTheme.textSecondary),
+                      _detailRow(Icons.schedule_rounded, 'Pickup Slot', widget.order.pickupSlot, AppTheme.textSecondary),
 
                       const SizedBox(height: 14),
 
                       // Categories
                       Wrap(
                         spacing: 6, runSpacing: 6,
-                        children: widget.lead.scrapCategories.map((c) => Container(
+                        children: scrapCategories.map((c) => Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(color: AppTheme.primaryLight, borderRadius: BorderRadius.circular(20)),
                           child: Text(c, style: const TextStyle(color: AppTheme.primaryDark, fontSize: 13, fontWeight: FontWeight.w700)),
                         )).toList(),
                       ),
 
-                      if (widget.lead.customerNotes != null && widget.lead.customerNotes!.isNotEmpty) ...[
+                      if (widget.order.customerNotes != null && widget.order.customerNotes!.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -202,9 +248,70 @@ class _LeadPopupState extends State<LeadPopup>
                           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             const Icon(Icons.notes_rounded, size: 16, color: AppTheme.textSecondary),
                             const SizedBox(width: 8),
-                            Expanded(child: Text(widget.lead.customerNotes!,
+                            Expanded(child: Text(widget.order.customerNotes!,
                               style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w500))),
                           ]),
+                        ),
+                      ],
+
+                      if (widget.order.imageUrls.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        const Text(
+                          'Scrap Photos',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          height: 80,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: widget.order.imageUrls.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 8),
+                            itemBuilder: (context, idx) {
+                              return GestureDetector(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => Dialog(
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Image.network(
+                                          widget.order.imageUrls[idx],
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: AppTheme.border),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(11),
+                                    child: Image.network(
+                                      widget.order.imageUrls[idx],
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        width: 80,
+                                        height: 80,
+                                        color: AppTheme.border,
+                                        child: const Icon(Icons.image_not_supported_rounded, color: AppTheme.textSecondary),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ],
                     ],

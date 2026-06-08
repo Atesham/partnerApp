@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/l10n/app_localizations.dart';
 import '../../../core/providers/order_provider.dart';
 import '../../../core/models/order_model.dart';
 import '../../../core/widgets/shared_widgets.dart';
@@ -22,6 +25,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   void initState() {
     super.initState();
     _loadOrder();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   void _loadOrder() {
@@ -48,7 +56,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   Future<void> _callCustomer() async {
     if (_order == null) return;
     final uri = Uri.parse('tel:${_order!.customerPhone}');
-    if (await canLaunchUrl(uri)) launchUrl(uri);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (mounted) {
+        AppTheme.showSnack(context, 'Could not open phone dialer.', isError: true);
+      }
+    }
   }
 
   Future<void> _startNavigation() async {
@@ -56,7 +70,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     final lat = _order!.customerLat;
     final lng = _order!.customerLng;
     final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
-    if (await canLaunchUrl(uri)) launchUrl(uri);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (mounted) {
+        AppTheme.showSnack(context, 'Could not open maps navigation.', isError: true);
+      }
+    }
   }
 
   @override
@@ -84,37 +104,30 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     final order = _order!;
     return Column(
       children: [
-        // Map area (placeholder — activate with real Google Maps key)
+        // Status header (Map removed for solid clean UI)
         Container(
-          height: 220,
+          width: double.infinity,
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [Color(0xFF064E3B), Color(0xFF047857)],
               begin: Alignment.topLeft, end: Alignment.bottomRight,
             ),
           ),
-          child: Stack(
-            children: [
-              Center(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.map_rounded, size: 56, color: Colors.white54),
-                  const SizedBox(height: 8),
-                  Text(order.customerAddress,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70, fontSize: 14)),
-                ]),
-              ),
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
                         child: Container(
                           width: 40, height: 40,
-                          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: AppTheme.subtleShadow),
-                          child: const Icon(Icons.arrow_back_rounded, size: 20, color: AppTheme.textPrimary),
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
+                          child: const Icon(Icons.arrow_back_rounded, size: 20, color: Colors.white),
                         ),
                       ),
                       const Spacer(),
@@ -130,9 +143,40 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48, height: 48,
+                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+                        child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              order.status == OrderStatus.partnerAssigned
+                                  ? 'Head to Customer Location'
+                                  : 'Arriving at Customer Destination',
+                              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              order.customerAddress,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
 
@@ -159,12 +203,148 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 const SizedBox(height: 20),
                 // Status CTA
                 _buildStatusCTA(order),
+                const SizedBox(height: 12),
+                // Cancel Order Option
+                if (order.status != OrderStatus.completed &&
+                    order.status != OrderStatus.cancelled &&
+                    order.status != OrderStatus.pickupStarted)
+                  _buildCancelButton(order),
               ],
             ),
           ),
         ),
       ],
     );
+  }
+
+  Widget _buildCancelButton(OrderModel order) {
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.cancel_rounded, size: 18),
+      label: Text(context.t('cancelPickup')),
+      onPressed: () => _showCancellationDialog(order),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppTheme.error,
+        side: const BorderSide(color: AppTheme.error, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        minimumSize: const Size(double.infinity, 50),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  void _showCancellationDialog(OrderModel order) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        String? selectedReason;
+        final reasons = [
+          'Vehicle breakdown',
+          'Customer unavailable / not responding',
+          'Negotiation failed / incorrect rate selection',
+          'Emergency / Personal reasons',
+          'Other',
+        ];
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text(context.t('cancelPickup'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: reasons.map((reason) {
+                  return RadioListTile<String>(
+                    title: Text(reason, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    value: reason,
+                    groupValue: selectedReason,
+                    activeColor: AppTheme.error,
+                    contentPadding: EdgeInsets.zero,
+                    onChanged: (val) => setDialogState(() => selectedReason = val),
+                  );
+                }).toList(),
+              ),
+              actions: [
+                TextButton(
+                  child: Text(context.t('goBack'), style: const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w700)),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                ElevatedButton(
+                  onPressed: selectedReason == null
+                      ? null
+                      : () async {
+                          Navigator.pop(context); // close dialog
+                          await _cancelOrder(order, selectedReason!);
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.error,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text(context.t('confirmCancel'), style: const TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _cancelOrder(OrderModel order, String reason) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    if (order.status == OrderStatus.pickupStarted ||
+        order.status == OrderStatus.completed ||
+        order.status == OrderStatus.cancelled) {
+      AppTheme.showSnack(context, 'This order cannot be cancelled after pickup has started.', isError: true);
+      return;
+    }
+
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+    );
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      final orderRef = FirebaseFirestore.instance.collection('orders').doc(order.orderId);
+      final partnerRef = FirebaseFirestore.instance.collection('partners').doc(uid);
+
+      // 1. Release the order back to searchingPartner in Firestore
+      batch.update(orderRef, {
+        'status': OrderStatus.searchingPartner.name,
+        'cancellationReason': reason,
+        'cancelledAt': FieldValue.serverTimestamp(),
+        'partnerId': null,
+        'partnerName': null,
+        'partnerPhone': null,
+        'partnerShopName': null,
+        'assignedAt': null,
+        'expiresAt': Timestamp.fromDate(DateTime.now().add(const Duration(minutes: 2))),
+      });
+
+      // 2. Mark the partner as available
+      batch.update(partnerRef, {
+        'isAvailable': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading indicator
+        Navigator.pop(context); // Exit the tracking screen
+        AppTheme.showSnack(context, 'Order cancelled successfully.');
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading indicator
+        AppTheme.showSnack(context, 'Failed to cancel order: $e', isError: true);
+      }
+    }
   }
 
   Widget _buildCustomerCard(OrderModel order) {
@@ -241,6 +421,59 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               child: Text(item.category, style: const TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w600, fontSize: 13)),
             )).toList(),
           ),
+          if (order.imageUrls.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text('Scrap Photos', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 80,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: order.imageUrls.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, idx) {
+                  return GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => Dialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.network(
+                              order.imageUrls[idx],
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppTheme.border),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(11),
+                        child: Image.network(
+                          order.imageUrls[idx],
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            width: 80,
+                            height: 80,
+                            color: AppTheme.border,
+                            child: const Icon(Icons.image_not_supported_rounded, color: AppTheme.textSecondary),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
           if (order.customerNotes != null && order.customerNotes!.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
@@ -291,7 +524,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       case OrderStatus.partnerArriving:
         return GradientButton(
           label: "I've Arrived",
-          onPressed: () => _updateStatus(OrderStatus.pickupStarted),
+          onPressed: () => _showOtpVerificationDialog(order),
           icon: Icons.check_circle_rounded,
         );
       case OrderStatus.pickupStarted:
@@ -310,5 +543,99 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  void _showOtpVerificationDialog(OrderModel order) {
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    String? errorMessage;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text(context.t('verifyPickupOtp'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      context.t('askCustomerOtp'),
+                      style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: controller,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 8),
+                      decoration: InputDecoration(
+                        counterText: '',
+                        hintText: '••••',
+                        hintStyle: const TextStyle(color: AppTheme.border, letterSpacing: 8),
+                        errorText: errorMessage,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppTheme.primary, width: 2),
+                        ),
+                      ),
+                      validator: (val) {
+                        if (val == null || val.length < 4) {
+                          return context.t('enterCode');
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: Text(context.t('cancel'), style: const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w700)),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (formKey.currentState!.validate()) {
+                      final enteredOtp = controller.text.trim();
+                      if (enteredOtp == order.pickupOtp) {
+                        Navigator.pop(context); // Close dialog
+                        await _updateStatus(OrderStatus.pickupStarted);
+                        if (mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => WeighingScreen(order: order),
+                            ),
+                          );
+                        }
+                      } else {
+                        setDialogState(() {
+                          errorMessage = context.t('incorrectOtp');
+                        });
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text(context.t('verifyOtp'), style: const TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }

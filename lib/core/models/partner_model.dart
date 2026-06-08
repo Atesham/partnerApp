@@ -4,6 +4,32 @@ enum PartnerStatus { pending, approved, suspended }
 
 enum VehicleType { bicycle, motorcycle, autoRickshaw, miniTruck, handCart }
 
+class ReservedSlot {
+  final String date;
+  final String slot;
+  final String orderId;
+
+  const ReservedSlot({
+    required this.date,
+    required this.slot,
+    required this.orderId,
+  });
+
+  factory ReservedSlot.fromJson(Map<String, dynamic> json) {
+    return ReservedSlot(
+      date: json['date'] ?? '',
+      slot: json['slot'] ?? '',
+      orderId: json['orderId'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'date': date,
+        'slot': slot,
+        'orderId': orderId,
+      };
+}
+
 class PartnerModel {
   final String uid;
   final String phone;
@@ -33,6 +59,26 @@ class PartnerModel {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  // -- Compliance, Trust & Operations Stack Fields --
+  final double trustScore;
+  final double completionRate;
+  final double cancellationRate;
+  final String fraudScore;
+  final String bankAccountName;
+  final String bankAccountNumber;
+  final String bankIfsc;
+  final String upiId;
+  final bool bankVerified;
+  final String aadhaarHash;
+  final bool aadhaarVerified;
+  final bool shopPhotosVerified;
+  final bool businessInfoVerified;
+  final bool addressVerified;
+  final bool deleted;
+  final double maxDistanceKm;
+  final int maxScheduledSlots;
+  final List<ReservedSlot> reservedSlots;
+
   const PartnerModel({
     required this.uid,
     required this.phone,
@@ -61,6 +107,24 @@ class PartnerModel {
     this.rating = 0.0,
     required this.createdAt,
     required this.updatedAt,
+    this.trustScore = 95.0,
+    this.completionRate = 98.0,
+    this.cancellationRate = 2.0,
+    this.fraudScore = 'Low Risk',
+    this.bankAccountName = '',
+    this.bankAccountNumber = '',
+    this.bankIfsc = '',
+    this.upiId = '',
+    this.bankVerified = false,
+    this.aadhaarHash = '',
+    this.aadhaarVerified = false,
+    this.shopPhotosVerified = false,
+    this.businessInfoVerified = false,
+    this.addressVerified = false,
+    this.deleted = false,
+    this.maxDistanceKm = 15.0,
+    this.maxScheduledSlots = 10,
+    this.reservedSlots = const [],
   });
 
   factory PartnerModel.empty() => PartnerModel(
@@ -77,6 +141,9 @@ class PartnerModel {
         vehicleTypes: [VehicleType.motorcycle],
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        maxDistanceKm: 15.0,
+        maxScheduledSlots: 10,
+        reservedSlots: const [],
       );
 
   factory PartnerModel.fromJson(Map<String, dynamic> json) {
@@ -111,11 +178,31 @@ class PartnerModel {
       isOnline: json['isOnline'] ?? false,
       currentLat: (json['currentLat'] ?? 0.0).toDouble(),
       currentLng: (json['currentLng'] ?? 0.0).toDouble(),
+      maxDistanceKm: (json['maxDistanceKm'] ?? 15.0).toDouble(),
       totalEarnings: double.tryParse(json['totalEarnings']?.toString() ?? '0') ?? 0.0,
       totalOrders: (json['totalOrders'] ?? 0),
       rating: double.tryParse(json['rating']?.toString() ?? '0') ?? 0.0,
       createdAt: (json['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (json['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      trustScore: (json['trustScore'] ?? 95.0).toDouble(),
+      completionRate: (json['completionRate'] ?? 98.0).toDouble(),
+      cancellationRate: (json['cancellationRate'] ?? 2.0).toDouble(),
+      fraudScore: json['fraudScore'] ?? 'Low Risk',
+      bankAccountName: json['bankAccountName'] ?? '',
+      bankAccountNumber: json['bankAccountNumber'] ?? '',
+      bankIfsc: json['bankIfsc'] ?? '',
+      upiId: json['upiId'] ?? '',
+      bankVerified: json['bankVerified'] ?? false,
+      aadhaarHash: json['aadhaarHash'] ?? '',
+      aadhaarVerified: json['aadhaarVerified'] ?? false,
+      shopPhotosVerified: json['shopPhotosVerified'] ?? false,
+      businessInfoVerified: json['businessInfoVerified'] ?? false,
+      addressVerified: json['addressVerified'] ?? false,
+      deleted: json['deleted'] ?? false,
+      maxScheduledSlots: json['maxScheduledSlots'] ?? 10,
+      reservedSlots: (json['reservedSlots'] as List<dynamic>? ?? [])
+          .map((e) => ReservedSlot.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 
@@ -143,6 +230,7 @@ class PartnerModel {
       'isOnline': isOnline,
       'currentLat': currentLat,
       'currentLng': currentLng,
+      'maxDistanceKm': maxDistanceKm,
       'totalEarnings': totalEarnings,
       'totalOrders': totalOrders,
       'rating': rating,
@@ -153,6 +241,23 @@ class PartnerModel {
         'geohash': _geohash(currentLat, currentLng),
         'geopoint': GeoPoint(currentLat, currentLng),
       },
+      'trustScore': trustScore,
+      'completionRate': completionRate,
+      'cancellationRate': cancellationRate,
+      'fraudScore': fraudScore,
+      'bankAccountName': bankAccountName,
+      'bankAccountNumber': bankAccountNumber,
+      'bankIfsc': bankIfsc,
+      'upiId': upiId,
+      'bankVerified': bankVerified,
+      'aadhaarHash': aadhaarHash,
+      'aadhaarVerified': aadhaarVerified,
+      'shopPhotosVerified': shopPhotosVerified,
+      'businessInfoVerified': businessInfoVerified,
+      'addressVerified': addressVerified,
+      'deleted': deleted,
+      'maxScheduledSlots': maxScheduledSlots,
+      'reservedSlots': reservedSlots.map((e) => e.toJson()).toList(),
     };
   }
 
@@ -184,6 +289,24 @@ class PartnerModel {
     double? rating,
     DateTime? createdAt,
     DateTime? updatedAt,
+    double? trustScore,
+    double? completionRate,
+    double? cancellationRate,
+    String? fraudScore,
+    String? bankAccountName,
+    String? bankAccountNumber,
+    String? bankIfsc,
+    String? upiId,
+    bool? bankVerified,
+    String? aadhaarHash,
+    bool? aadhaarVerified,
+    bool? shopPhotosVerified,
+    bool? businessInfoVerified,
+    bool? addressVerified,
+    bool? deleted,
+    double? maxDistanceKm,
+    int? maxScheduledSlots,
+    List<ReservedSlot>? reservedSlots,
   }) {
     return PartnerModel(
       uid: uid ?? this.uid,
@@ -213,6 +336,24 @@ class PartnerModel {
       rating: rating ?? this.rating,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      trustScore: trustScore ?? this.trustScore,
+      completionRate: completionRate ?? this.completionRate,
+      cancellationRate: cancellationRate ?? this.cancellationRate,
+      fraudScore: fraudScore ?? this.fraudScore,
+      bankAccountName: bankAccountName ?? this.bankAccountName,
+      bankAccountNumber: bankAccountNumber ?? this.bankAccountNumber,
+      bankIfsc: bankIfsc ?? this.bankIfsc,
+      upiId: upiId ?? this.upiId,
+      bankVerified: bankVerified ?? this.bankVerified,
+      aadhaarHash: aadhaarHash ?? this.aadhaarHash,
+      aadhaarVerified: aadhaarVerified ?? this.aadhaarVerified,
+      shopPhotosVerified: shopPhotosVerified ?? this.shopPhotosVerified,
+      businessInfoVerified: businessInfoVerified ?? this.businessInfoVerified,
+      addressVerified: addressVerified ?? this.addressVerified,
+      deleted: deleted ?? this.deleted,
+      maxDistanceKm: maxDistanceKm ?? this.maxDistanceKm,
+      maxScheduledSlots: maxScheduledSlots ?? this.maxScheduledSlots,
+      reservedSlots: reservedSlots ?? this.reservedSlots,
     );
   }
 

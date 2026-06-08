@@ -45,6 +45,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   double _shopLng = 77.2090;
 
   bool _isUploading = false;
+  bool _isFetchingLocation = false;
 
   File? _profileImage;
   File? _shopImage;
@@ -148,7 +149,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         imageQuality: 70,
       );
       if (pickedFile != null) {
-        return File(pickedFile.path);
+        final tempFile = File(pickedFile.path);
+        try {
+          final filesPath = tempFile.parent.path.replaceAll('/cache', '/files');
+          final filesDir = Directory(filesPath);
+          if (!await filesDir.exists()) {
+            await filesDir.create(recursive: true);
+          }
+          final fileName = tempFile.path.replaceAll('\\', '/').split('/').last;
+          final persistentFile = await tempFile.copy(
+            '${filesDir.path}/persisted_${DateTime.now().millisecondsSinceEpoch}_$fileName',
+          );
+          return persistentFile;
+        } catch (_) {
+          return tempFile;
+        }
       }
     }
     return null;
@@ -179,12 +194,61 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Future<void> _fetchLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      if (mounted)
-        AppTheme.showSnack(
-          context,
-          'Location services are disabled.',
-          isError: true,
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder:
+              (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                title: Row(
+                  children: [
+                    const Icon(
+                      Icons.location_off_rounded,
+                      color: AppTheme.error,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'GPS is Turned Off',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                content: const Text(
+                  'Please turn on device location (GPS) to find your shop coordinates automatically.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await Geolocator.openLocationSettings();
+                    },
+                    child: const Text('Open Settings'),
+                  ),
+                ],
+              ),
         );
+      }
       return;
     }
 
@@ -206,16 +270,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (mounted)
         AppTheme.showSnack(
           context,
-          'Location permissions are permanently denied.',
+          'Location permissions are permanently denied. Please enable them in settings.',
           isError: true,
         );
       return;
     }
 
-    if (mounted) AppTheme.showSnack(context, 'Fetching location...');
+    setState(() => _isFetchingLocation = true);
     try {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
       );
       List<Placemark> placemarks = await placemarkFromCoordinates(
         position.latitude,
@@ -227,14 +292,36 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         _shopLng = position.longitude;
         if (placemarks.isNotEmpty) {
           final place = placemarks.first;
+          final subLoc = place.subLocality ?? place.name ?? '';
+          final loc = place.locality ?? place.subAdministrativeArea ?? '';
+          final pin = place.postalCode ?? '';
           _shopAddress.text =
-              '${place.subLocality}, ${place.locality}, ${place.postalCode}'
-                  .replaceAll(', ,', ',');
+              '$subLoc, $loc, $pin'.replaceAll(', ,', ',').trim();
+          if (_shopAddress.text.startsWith(',')) {
+            _shopAddress.text = _shopAddress.text.substring(1).trim();
+          }
+          if (_shopAddress.text.endsWith(',')) {
+            _shopAddress.text =
+                _shopAddress.text
+                    .substring(0, _shopAddress.text.length - 1)
+                    .trim();
+          }
+        } else {
+          _shopAddress.text =
+              '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}';
         }
       });
     } catch (e) {
       if (mounted)
-        AppTheme.showSnack(context, 'Failed to fetch location.', isError: true);
+        AppTheme.showSnack(
+          context,
+          'Failed to fetch location. Please try again.',
+          isError: true,
+        );
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingLocation = false);
+      }
     }
   }
 
@@ -350,50 +437,57 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
-  Future<String> _uploadToCloudinary(File file, String folderPath) async {
-    // Compress image locally first
-    final filePath = file.absolute.path;
-    final lastIndex = filePath.lastIndexOf(RegExp(r'\.jp|\.png|\.jpeg'));
-    String outPath;
-    if (lastIndex == -1) {
-      outPath = '${filePath}_out.jpg';
-    } else {
-      outPath = '${filePath.substring(0, lastIndex)}_out${filePath.substring(lastIndex)}';
+  Future<String> _uploadToSupabase(File file, String folderPath) async {
+    // Verify file exists
+    if (!await file.exists()) {
+      throw Exception('Image file does not exist at path: ${file.path}');
     }
-    
-    var result = await FlutterImageCompress.compressAndGetFile(
-      file.absolute.path, 
-      outPath,
-      quality: 70,
+
+    // Supabase Credentials
+    const String projectId = 'jdmwvxghimqiwpsbbeak';
+    const String anonKey =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpkbXd2eGdoaW1xaXdwc2JiZWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NzU3MTAsImV4cCI6MjA5NjI1MTcxMH0.qSw2mhDyVjrpCAvwfxPMaWYyIncrrAYjOEzdJYuoxd8';
+
+    // Parse folderPath into bucketName and subPath (e.g. 'partners/$uid')
+    final parts = folderPath.split('/');
+    final bucketName = parts.first;
+    final subPath = parts.skip(1).join('/');
+
+    // Get unique file name
+    final fileName = file.path.replaceAll('\\', '/').split('/').last;
+    final uniqueFileName = '${DateTime.now().millisecondsSinceEpoch}_$fileName';
+    final finalPath =
+        subPath.isNotEmpty ? '$subPath/$uniqueFileName' : uniqueFileName;
+
+    // Detect Content-Type
+    String contentType = 'image/jpeg';
+    if (fileName.toLowerCase().endsWith('.png')) {
+      contentType = 'image/png';
+    } else if (fileName.toLowerCase().endsWith('.gif')) {
+      contentType = 'image/gif';
+    }
+
+    final url = Uri.parse(
+      'https://$projectId.supabase.co/storage/v1/object/$bucketName/$finalPath',
     );
-    
-    final uploadFile = result != null ? File(result.path) : file;
+    final bytes = await file.readAsBytes();
 
-    const cloudName = 'dxw2a6qre';
-    const apiKey = '869265725253875';
-    const apiSecret = 'FpxbdxUTzQtj7m1hlmSlAQofaVo';
-    final timestamp = (DateTime.now().millisecondsSinceEpoch / 1000).round().toString();
+    final response = await http.post(
+      url,
+      headers: {
+        'apikey': anonKey,
+        'Authorization': 'Bearer $anonKey',
+        'Content-Type': contentType,
+      },
+      body: bytes,
+    );
 
-    // Alphabetical order for signature: folder, timestamp
-    final paramsToSign = 'folder=$folderPath&timestamp=$timestamp$apiSecret';
-    final bytes = utf8.encode(paramsToSign);
-    final signature = sha1.convert(bytes).toString();
-
-    var request = http.MultipartRequest('POST', Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload'));
-    request.fields['api_key'] = apiKey;
-    request.fields['timestamp'] = timestamp;
-    request.fields['signature'] = signature;
-    request.fields['folder'] = folderPath;
-    
-    request.files.add(await http.MultipartFile.fromPath('file', uploadFile.path));
-    var response = await request.send();
-    var responseData = await response.stream.bytesToString();
-    var jsonMap = jsonDecode(responseData);
-    
-    if (response.statusCode == 200) {
-      return jsonMap['secure_url'];
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return 'https://$projectId.supabase.co/storage/v1/object/public/$bucketName/$finalPath';
     } else {
-      throw Exception('Cloudinary upload failed: ${jsonMap["error"]["message"]}');
+      throw Exception(
+        'Supabase upload failed (${response.statusCode}): ${response.body}',
+      );
     }
   }
 
@@ -403,28 +497,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     final phone = FirebaseAuth.instance.currentUser?.phoneNumber ?? '';
 
     try {
-      // Upload Images to Cloudinary
+      // Upload Images to Supabase
       final String profileUrl =
           _profileImage != null
-              ? await _uploadToCloudinary(_profileImage!, 'partners/$uid')
+              ? await _uploadToSupabase(_profileImage!, 'partners/$uid')
               : '';
       final String shopUrl =
           _shopImage != null
-              ? await _uploadToCloudinary(_shopImage!, 'partners/$uid')
+              ? await _uploadToSupabase(_shopImage!, 'partners/$uid')
               : '';
       final String aadhaarFrontUrl =
           _aadhaarFront != null
-              ? await _uploadToCloudinary(
-                _aadhaarFront!,
-                'partners/$uid',
-              )
+              ? await _uploadToSupabase(_aadhaarFront!, 'partners/$uid')
               : '';
       final String aadhaarBackUrl =
           _aadhaarBack != null
-              ? await _uploadToCloudinary(
-                _aadhaarBack!,
-                'partners/$uid',
-              )
+              ? await _uploadToSupabase(_aadhaarBack!, 'partners/$uid')
               : '';
 
       List<String> finalCategories = _categories.toList();
@@ -467,15 +555,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (!mounted) return;
 
       if (ok) {
-        try {
-          final url = Uri.parse(
-            'https://wa.me/918744081962?text=New%20Vendor%20Registration%20Alert:%20${partner.shopName}%20needs%20verification.',
-          );
-          await launchUrl(url, mode: LaunchMode.externalApplication);
-        } catch (e) {
-          // ignore WhatsApp error
-        }
-
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,
@@ -490,7 +569,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (mounted)
         AppTheme.showSnack(
           context,
-          'Failed to submit registration. Please try again.',
+          'Failed to submit registration: $e',
           isError: true,
         );
     } finally {
@@ -513,165 +592,178 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _prev();
-      },
-      child: Scaffold(
-        backgroundColor: AppTheme.background,
-        body: SafeArea(
-          child: Column(
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: Column(
-                  children: [
-                    Row(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _prev();
+        },
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          body: SafeArea(
+            child: ResponsiveWrapper(
+              child: Column(
+                children: [
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: Column(
                       children: [
-                        GestureDetector(
-                          onTap: _prev,
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.border),
-                            ),
-                            child: const Icon(
-                              Icons.arrow_back_rounded,
-                              size: 20,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                context.t('partnerReg'),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: _prev,
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppTheme.border),
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_back_rounded,
+                                  size: 20,
                                   color: AppTheme.textPrimary,
                                 ),
                               ),
-                              Text(
-                                '${context.t('step')} ${_step + 1} ${context.t('of')} 4 · ${_stepTitles[_step]}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    context.t('partnerReg'),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${context.t('step')} ${_step + 1} ${context.t('of')} 4 · ${_stepTitles[_step]}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Progress bar
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: (_step + 1) / 4,
+                            backgroundColor: AppTheme.border,
+                            valueColor: const AlwaysStoppedAnimation(
+                              AppTheme.primary,
+                            ),
+                            minHeight: 5,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    // Progress bar
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: (_step + 1) / 4,
-                        backgroundColor: AppTheme.border,
-                        valueColor: const AlwaysStoppedAnimation(
-                          AppTheme.primary,
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _StepBasicInfo(
+                          nameCtrl: _fullName,
+                          profileImage: _profileImage,
+                          onPickImage: _pickImage,
                         ),
-                        minHeight: 5,
-                      ),
+                        _StepShopDetails(
+                          shopNameCtrl: _shopName,
+                          shopAddressCtrl: _shopAddress,
+                          exactAddressCtrl: _exactAddress,
+                          gstCtrl: _gst,
+                          aadhaarCtrl: _aadhaar,
+                          shopImage: _shopImage,
+                          aadhaarFront: _aadhaarFront,
+                          aadhaarBack: _aadhaarBack,
+                          onFetchLocation: _fetchLocation,
+                          onClearLocation:
+                              () => setState(() {
+                                _shopAddress.clear();
+                              }),
+                          onPickShopImage: _pickShopImage,
+                          onPickAadhaar: _pickAadhaarImage,
+                          isFetchingLocation: _isFetchingLocation,
+                        ),
+                        _StepCategories(
+                          options: _scrapOptions,
+                          selected: _categories,
+                          otherSelected: _otherCategorySelected,
+                          otherCtrl: _otherCategoryCtrl,
+                          onToggle:
+                              (c) => setState(() {
+                                if (_categories.contains(c))
+                                  _categories.remove(c);
+                                else
+                                  _categories.add(c);
+                              }),
+                          onToggleOther:
+                              (val) => setState(() {
+                                _otherCategorySelected = val;
+                                if (!val) _otherCategoryCtrl.clear();
+                              }),
+                        ),
+                        _StepVehicle(
+                          vehicles: _vehicles,
+                          selectedTypes: _vehicleTypes,
+                          workStart: _workStart,
+                          workEnd: _workEnd,
+                          onVehicle:
+                              (v) => setState(() {
+                                if (_vehicleTypes.contains(v)) {
+                                  if (_vehicleTypes.length > 1)
+                                    _vehicleTypes.remove(v);
+                                } else {
+                                  _vehicleTypes.add(v);
+                                }
+                              }),
+                          onStartTime: (t) => setState(() => _workStart = t),
+                          onEndTime: (t) => setState(() => _workEnd = t),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
 
-              const SizedBox(height: 8),
-
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _StepBasicInfo(
-                      nameCtrl: _fullName,
-                      profileImage: _profileImage,
-                      onPickImage: _pickImage,
+                  // Bottom button
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+                    child: GradientButton(
+                      label:
+                          _step < 3
+                              ? context.t('next')
+                              : context.t('submitReg'),
+                      onPressed: _next,
+                      isLoading: _isLoading,
+                      icon:
+                          _step < 3
+                              ? Icons.arrow_forward_rounded
+                              : Icons.check_rounded,
                     ),
-                    _StepShopDetails(
-                      shopNameCtrl: _shopName,
-                      shopAddressCtrl: _shopAddress,
-                      exactAddressCtrl: _exactAddress,
-                      gstCtrl: _gst,
-                      aadhaarCtrl: _aadhaar,
-                      shopImage: _shopImage,
-                      aadhaarFront: _aadhaarFront,
-                      aadhaarBack: _aadhaarBack,
-                      onFetchLocation: _fetchLocation,
-                      onClearLocation:
-                          () => setState(() {
-                            _shopAddress.clear();
-                          }),
-                      onPickShopImage: _pickShopImage,
-                      onPickAadhaar: _pickAadhaarImage,
-                    ),
-                    _StepCategories(
-                      options: _scrapOptions,
-                      selected: _categories,
-                      otherSelected: _otherCategorySelected,
-                      otherCtrl: _otherCategoryCtrl,
-                      onToggle:
-                          (c) => setState(() {
-                            if (_categories.contains(c))
-                              _categories.remove(c);
-                            else
-                              _categories.add(c);
-                          }),
-                      onToggleOther:
-                          (val) => setState(() {
-                            _otherCategorySelected = val;
-                            if (!val) _otherCategoryCtrl.clear();
-                          }),
-                    ),
-                    _StepVehicle(
-                      vehicles: _vehicles,
-                      selectedTypes: _vehicleTypes,
-                      workStart: _workStart,
-                      workEnd: _workEnd,
-                      onVehicle:
-                          (v) => setState(() {
-                            if (_vehicleTypes.contains(v)) {
-                              if (_vehicleTypes.length > 1)
-                                _vehicleTypes.remove(v);
-                            } else {
-                              _vehicleTypes.add(v);
-                            }
-                          }),
-                      onStartTime: (t) => setState(() => _workStart = t),
-                      onEndTime: (t) => setState(() => _workEnd = t),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-
-              // Bottom button
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-                child: GradientButton(
-                  label: _step < 3 ? context.t('next') : context.t('submitReg'),
-                  onPressed: _next,
-                  isLoading: _isLoading,
-                  icon:
-                      _step < 3
-                          ? Icons.arrow_forward_rounded
-                          : Icons.check_rounded,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -837,6 +929,7 @@ class _StepShopDetails extends StatelessWidget {
   final VoidCallback onClearLocation;
   final VoidCallback onPickShopImage;
   final Function(bool isFront) onPickAadhaar;
+  final bool isFetchingLocation;
 
   const _StepShopDetails({
     required this.shopNameCtrl,
@@ -851,6 +944,7 @@ class _StepShopDetails extends StatelessWidget {
     required this.onClearLocation,
     required this.onPickShopImage,
     required this.onPickAadhaar,
+    required this.isFetchingLocation,
   });
 
   @override
@@ -889,83 +983,239 @@ class _StepShopDetails extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          Row(children: [Expanded(child: _label(context.t('shopAddress')))]),
-          const SizedBox(height: 8),
-          shopAddressCtrl.text.isEmpty
-              ? GestureDetector(
-                onTap: onFetchLocation,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 16,
-                    horizontal: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryLight,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppTheme.primary.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.my_location_rounded,
-                        color: AppTheme.primary,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          context.t('fetchLocation') ??
-                              'Fetch Location from Map',
-                          style: const TextStyle(
-                            color: AppTheme.primaryDark,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-              : Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.border, width: 1.5),
-                ),
-                child: Row(
+          // Shop Location Verification Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: AppTheme.subtleShadow,
+              border: Border.all(
+                color:
+                    isFetchingLocation
+                        ? AppTheme.primary
+                        : shopAddressCtrl.text.isNotEmpty
+                        ? AppTheme.primary.withOpacity(0.4)
+                        : AppTheme.border,
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    const Icon(
-                      Icons.location_on_rounded,
-                      color: AppTheme.primary,
-                      size: 24,
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color:
+                            isFetchingLocation
+                                ? AppTheme.primaryLight
+                                : shopAddressCtrl.text.isNotEmpty
+                                ? AppTheme.primaryLight
+                                : const Color(0xFFF3F4F6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isFetchingLocation
+                            ? Icons.my_location_rounded
+                            : shopAddressCtrl.text.isNotEmpty
+                            ? Icons.verified_user_rounded
+                            : Icons.location_off_rounded,
+                        color:
+                            isFetchingLocation
+                                ? AppTheme.primary
+                                : shopAddressCtrl.text.isNotEmpty
+                                ? AppTheme.primary
+                                : AppTheme.textSecondary,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        shopAddressCtrl.text,
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            context.t('shopLocation') ?? 'Shop GPS Location',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isFetchingLocation
+                                ? 'Pinpointing GPS location...'
+                                : shopAddressCtrl.text.isNotEmpty
+                                ? 'Location mapped successfully'
+                                : 'GPS location is required for routing pickups',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color:
+                                  isFetchingLocation
+                                      ? AppTheme.primary
+                                      : shopAddressCtrl.text.isNotEmpty
+                                      ? AppTheme.primaryDark
+                                      : AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: onClearLocation,
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: AppTheme.textSecondary,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 16),
+                if (isFetchingLocation) ...[
+                  // Inline Loader
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    alignment: Alignment.center,
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          'Locating shop coordinates via GPS...',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (shopAddressCtrl.text.isEmpty) ...[
+                  // Mapped location empty state (Action Button)
+                  GestureDetector(
+                    onTap: onFetchLocation,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primary.withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.my_location_rounded,
+                            color: AppTheme.primary,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            context.t('fetchLocation') ??
+                                'Use Current GPS Location',
+                            style: const TextStyle(
+                              color: AppTheme.primaryDark,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  // Resolved Mapped Location State
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppTheme.background,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.border, width: 1.5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.pin_drop_rounded,
+                              color: AppTheme.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                shopAddressCtrl.text,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textPrimary,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton.icon(
+                                onPressed: onFetchLocation,
+                                icon: const Icon(
+                                  Icons.refresh_rounded,
+                                  size: 16,
+                                  color: AppTheme.primary,
+                                ),
+                                label: const Text(
+                                  'Recalibrate GPS',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.primary,
+                                  ),
+                                ),
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  alignment: Alignment.centerLeft,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: onClearLocation,
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: AppTheme.error,
+                                size: 20,
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
           const SizedBox(height: 20),
           _label(
             context.t('exactAddress') ??

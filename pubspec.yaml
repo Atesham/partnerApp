@@ -1,5 +1,5 @@
-name: scrapdirect_partner
-description: "ScrapDirect Partner - Scrap shop owner app for receiving and managing pickup leads"
+name: scrapwell_partner
+description: "Scrapwell Partner - Scrap shop owner app for receiving and managing pickup leads"
 publish_to: 'none'
 version: 1.0.0+1
 

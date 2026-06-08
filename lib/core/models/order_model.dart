@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum OrderStatus {
   searchingPartner,
+  reserved,
   partnerAssigned,
   partnerArriving,
   pickupStarted,
@@ -70,6 +71,9 @@ class OrderModel {
   final DateTime? assignedAt;
   final DateTime? completedAt;
   final DateTime? expiresAt;
+  final String pickupOtp;
+  final String pickupType; // "instant" or "scheduled"
+  final String? reservedPartnerId;
 
   const OrderModel({
     required this.orderId,
@@ -95,6 +99,9 @@ class OrderModel {
     this.assignedAt,
     this.completedAt,
     this.expiresAt,
+    this.pickupOtp = '',
+    this.pickupType = 'instant',
+    this.reservedPartnerId,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -127,6 +134,9 @@ class OrderModel {
       assignedAt: (json['assignedAt'] as Timestamp?)?.toDate(),
       completedAt: (json['completedAt'] as Timestamp?)?.toDate(),
       expiresAt: (json['expiresAt'] as Timestamp?)?.toDate(),
+      pickupOtp: json['otp']?.toString() ?? json['pickupOtp']?.toString() ?? '',
+      pickupType: json['pickupType'] ?? 'instant',
+      reservedPartnerId: json['reservedPartnerId'],
     );
   }
 
@@ -154,6 +164,9 @@ class OrderModel {
         'assignedAt': assignedAt != null ? Timestamp.fromDate(assignedAt!) : null,
         'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
         'expiresAt': expiresAt != null ? Timestamp.fromDate(expiresAt!) : null,
+        'pickupOtp': pickupOtp,
+        'pickupType': pickupType,
+        'reservedPartnerId': reservedPartnerId,
       };
 
   OrderModel copyWith({
@@ -180,6 +193,9 @@ class OrderModel {
     DateTime? assignedAt,
     DateTime? completedAt,
     DateTime? expiresAt,
+    String? pickupOtp,
+    String? pickupType,
+    String? reservedPartnerId,
   }) {
     return OrderModel(
       orderId: orderId ?? this.orderId,
@@ -205,6 +221,9 @@ class OrderModel {
       assignedAt: assignedAt ?? this.assignedAt,
       completedAt: completedAt ?? this.completedAt,
       expiresAt: expiresAt ?? this.expiresAt,
+      pickupOtp: pickupOtp ?? this.pickupOtp,
+      pickupType: pickupType ?? this.pickupType,
+      reservedPartnerId: reservedPartnerId ?? this.reservedPartnerId,
     );
   }
 
@@ -213,6 +232,43 @@ class OrderModel {
         OrderStatus.partnerArriving,
         OrderStatus.pickupStarted,
       ].contains(status);
+
+  DateTime get scheduledDateTime {
+    final defaultDate = createdAt.add(const Duration(days: 1));
+    try {
+      if (pickupSlot.isEmpty) return defaultDate;
+      final parts = pickupSlot.split(',');
+      final dateStr = parts[0].trim().toLowerCase();
+      DateTime date;
+      if (dateStr == 'tomorrow') {
+        final now = DateTime.now();
+        date = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+      } else if (dateStr == 'today') {
+        final now = DateTime.now();
+        date = DateTime(now.year, now.month, now.day);
+      } else {
+        date = DateTime.parse(dateStr);
+      }
+      if (parts.length > 1) {
+        final timeStr = parts[1].trim().toUpperCase();
+        final startHourStr = timeStr.split('-')[0].trim();
+        final match = RegExp(r'(\d+)\s*(AM|PM)').firstMatch(startHourStr);
+        if (match != null) {
+          int hour = int.parse(match.group(1)!);
+          final amPm = match.group(2);
+          if (amPm == 'PM' && hour < 12) {
+            hour += 12;
+          } else if (amPm == 'AM' && hour == 12) {
+            hour = 0;
+          }
+          return DateTime(date.year, date.month, date.day, hour);
+        }
+      }
+      return DateTime(date.year, date.month, date.day, 12);
+    } catch (_) {
+      return defaultDate;
+    }
+  }
 
   double get totalEstimatedWeight =>
       scrapItems.fold(0, (sum, item) => sum + item.estimatedWeight);
@@ -224,6 +280,8 @@ class OrderModel {
     switch (status) {
       case OrderStatus.searchingPartner:
         return 'Searching Partner';
+      case OrderStatus.reserved:
+        return 'Reserved (Scheduled)';
       case OrderStatus.partnerAssigned:
         return 'Partner Assigned';
       case OrderStatus.partnerArriving:

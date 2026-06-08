@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -19,8 +20,14 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const Scaffold();
 
-    return StreamBuilder<DocumentSnapshot>(
-      stream:
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+      child: StreamBuilder<DocumentSnapshot>(
+        stream:
           FirebaseFirestore.instance
               .collection('partners')
               .doc(uid)
@@ -45,105 +52,140 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
           child: Scaffold(
             backgroundColor: AppTheme.background,
             body: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Spacer(flex: 2),
-                    // Animated icon
-                    _AnimatedCheckIcon(),
-                    const SizedBox(height: 32),
-                    const Text(
-                      'Account Under\nVerification',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.textPrimary,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Our team is reviewing your details. You\'ll be notified via SMS within 24–48 hours once approved.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: AppTheme.textSecondary,
-                        height: 1.6,
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    // Steps
-                    ..._steps.map((s) => _buildStep(s[0], s[1], s[2] == '1')),
-                    const Spacer(flex: 2),
-                    // Contact support
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.support_agent_rounded),
-                        label: const Text('Contact Support'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.primary,
-                          side: const BorderSide(
-                            color: AppTheme.primary,
-                            width: 1.5,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        onPressed: () async {
-                          final uri = Uri.parse(
-                            'https://wa.me/919999999999?text=Hi, I registered on ScrapDirect Partner and my account is pending verification.',
-                          );
-                          if (await canLaunchUrl(uri)) launchUrl(uri);
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () async {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Checking status...'),
-                            duration: Duration(seconds: 1),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      await PartnerProvider().loadPartner();
+                      if (PartnerProvider().isApproved && mounted) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MainScreen(),
                           ),
                         );
-                        await PartnerProvider().loadPartner();
-                        if (PartnerProvider().isApproved && mounted) {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const MainScreen(),
+                      }
+                    },
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 28),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Spacer(flex: 2),
+                                // Animated icon
+                                _AnimatedCheckIcon(),
+                                const SizedBox(height: 32),
+                                const Text(
+                                  'Account Under\nVerification',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 30,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.textPrimary,
+                                    height: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                const Text(
+                                  'Our team is reviewing your details. You\'ll be notified via SMS within 24–48 hours once approved.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: AppTheme.textSecondary,
+                                    height: 1.6,
+                                  ),
+                                ),
+                                const SizedBox(height: 40),
+                                // Steps
+                                ..._steps.map((s) => _buildStep(s[0], s[1], s[2] == '1')),
+                                const Spacer(flex: 2),
+                                // Contact support
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 56,
+                                  child: OutlinedButton.icon(
+                                    icon: const Icon(Icons.support_agent_rounded),
+                                    label: const Text('Contact Support'),
+                                    onPressed: () async {
+                                      final uri = Uri.parse(
+                                        'https://wa.me/918744081962?text=Hi, I registered on Scrapwell Partner and my account is pending verification.',
+                                      );
+                                      try {
+                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      } catch (_) {
+                                        final webUri = Uri.parse(
+                                          'https://api.whatsapp.com/send?phone=918744081962&text=Hi, I registered on Scrapwell Partner and my account is pending verification.',
+                                        );
+                                        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+                                      }
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppTheme.primary,
+                                      side: const BorderSide(
+                                        color: AppTheme.primary,
+                                        width: 1.5,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      textStyle: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                TextButton(
+                                  onPressed: () async {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Checking status...'),
+                                        duration: Duration(seconds: 1),
+                                      ),
+                                    );
+                                    await PartnerProvider().loadPartner();
+                                    if (PartnerProvider().isApproved && mounted) {
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const MainScreen(),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: const Text(
+                                    'Refresh Status',
+                                    style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+                              ],
                             ),
-                          );
-                        }
-                      },
-                      child: const Text(
-                        'Refresh Status',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 32),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),
         );
       },
-    );
-  }
+    ),
+  );
+}
 
   static const _steps = [
     ['1', 'Registration Submitted', '1'],

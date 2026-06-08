@@ -12,7 +12,7 @@
     <uses-permission android:name="android.permission.CALL_PHONE"/>
 
     <application
-        android:label="ScrapDirect Partner"
+        android:label="Scrapwell Partner"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
@@ -24,7 +24,7 @@
         <!-- Firebase Cloud Messaging -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="scrapdirect_partner_channel"/>
+            android:value="scrapwell_partner_channel"/>
 
         <activity
             android:name=".MainActivity"
