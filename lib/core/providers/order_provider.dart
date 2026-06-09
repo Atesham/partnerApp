@@ -168,6 +168,7 @@ class OrderProvider extends ChangeNotifier {
     _scheduledSub = null;
     _autoAssigning.clear();
     _activeOrders = [];
+    _reservedOrders = []; // was missing — caused stale orders after logout
     _completedOrders = [];
     _cancelledOrders = [];
     _currentOrder = null;

@@ -19,7 +19,10 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _tab = TabController(length: 3, vsync: this);
-    _orders.listenToOrders();
+    // DO NOT call _orders.listenToOrders() here — OrderProvider is a singleton
+    // and its stream is already started (and shared) by HomeScreen.initState().
+    // Re-calling it here would cancel + recreate the subscription, potentially
+    // dropping in-flight Firestore events.
   }
 
   @override
@@ -57,7 +60,11 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         builder: (_, __) => TabBarView(
           controller: _tab,
           children: [
-            _OrderList(orders: _orders.activeOrders, emptyMsg: 'No active orders'),
+            // Active tab shows both currently-active AND upcoming reserved orders
+            _OrderList(
+              orders: [..._orders.reservedOrders, ..._orders.activeOrders],
+              emptyMsg: 'No active or scheduled orders',
+            ),
             _OrderList(orders: _orders.completedOrders, emptyMsg: 'No completed orders yet'),
             _OrderList(orders: _orders.cancelledOrders, emptyMsg: 'No cancelled orders'),
           ],
@@ -98,14 +105,20 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Reserved/scheduled orders get an amber accent so they stand out
     final statusColor = order.status == OrderStatus.completed
         ? AppTheme.success
         : order.status == OrderStatus.cancelled
             ? AppTheme.error
-            : AppTheme.primary;
+            : order.status == OrderStatus.reserved
+                ? const Color(0xFFEA580C) // orange for scheduled
+                : AppTheme.primary;
+
+    // Allow navigation for both active AND reserved orders
+    final isNavigable = order.isActive || order.status == OrderStatus.reserved;
 
     return GestureDetector(
-      onTap: order.isActive
+      onTap: isNavigable
           ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => OrderTrackingScreen(orderId: order.orderId)))
           : null,
       child: Container(

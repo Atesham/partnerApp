@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/l10n/app_localizations.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/providers/partner_provider.dart';
 import '../../../core/widgets/shared_widgets.dart';
 import '../../registration/presentation/registration_screen.dart';
@@ -14,7 +15,11 @@ import '../../main/presentation/main_screen.dart';
 class OtpScreen extends StatefulWidget {
   final String phone;
   final String verificationId;
-  const OtpScreen({super.key, required this.phone, required this.verificationId});
+  const OtpScreen({
+    super.key,
+    required this.phone,
+    required this.verificationId,
+  });
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -57,10 +62,12 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 0.12),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _entryCtrl,
-      curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _entryCtrl,
+        curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
     _headerScaleAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(
         parent: _entryCtrl,
@@ -79,18 +86,20 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
-    _shakeAnim = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _shakeCtrl, curve: Curves.elasticIn),
-    );
+    _shakeAnim = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _shakeCtrl, curve: Curves.elasticIn));
 
     // Success burst
     _successCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _successScaleAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _successCtrl, curve: Curves.elasticOut),
-    );
+    _successScaleAnim = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _successCtrl, curve: Curves.elasticOut));
 
     _timerCtrl.addStatusListener((s) {
       if (s == AnimationStatus.completed && mounted) {
@@ -116,10 +125,18 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     _shakeCtrl.forward();
   }
 
+  void _goBack() {
+    AuthService.instance.signOut();
+    Navigator.pop(context);
+  }
+
   Future<void> _verify(String otp) async {
     if (otp.length != 6) return;
     FocusScope.of(context).unfocus();
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
       final credential = await AuthService.instance.verifyOtp(otp);
@@ -127,18 +144,24 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
       final uid = credential.user?.uid;
       if (uid == null) {
-        setState(() { _isLoading = false; _error = 'Authentication failed'; });
+        setState(() {
+          _isLoading = false;
+          _error = 'Authentication failed';
+        });
         _shakeOnError();
         return;
       }
 
-      // Show success state before navigating
-      setState(() { _isLoading = false; _isSuccess = true; });
-      await _successCtrl.forward();
-      await Future.delayed(const Duration(milliseconds: 800));
+      final isRegistered = await AuthService.instance.isPartnerRegistered(uid);
       if (!mounted) return;
 
-      final isRegistered = await AuthService.instance.isPartnerRegistered(uid);
+      // Show success state before navigating
+      setState(() {
+        _isLoading = false;
+        _isSuccess = true;
+      });
+      await _successCtrl.forward();
+      await Future.delayed(const Duration(milliseconds: 800));
       if (!mounted) return;
 
       if (!isRegistered) {
@@ -150,6 +173,20 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
       await partner.loadPartner();
       if (!mounted) return;
 
+      if (partner.error != null) {
+        setState(() {
+          _isLoading = false;
+          _isSuccess = false;
+          _error = partner.error;
+        });
+        _successCtrl.reset();
+        _shakeOnError();
+        return;
+      }
+
+      // Update FCM Token on successful sign in
+      await NotificationService.instance.updateFcmToken();
+
       if (partner.isApproved) {
         partner.listenToPartner();
         _navigateClearStack(const MainScreen());
@@ -160,11 +197,21 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
       String msg = 'Verification failed';
       if (e.code == 'invalid-verification-code') msg = context.t('invalidOtp');
       if (e.code == 'session-expired') msg = context.t('otpExpired');
-      setState(() { _isLoading = false; _error = msg; });
+      setState(() {
+        _isLoading = false;
+        _isSuccess = false;
+        _error = msg;
+      });
+      _successCtrl.reset();
       _shakeOnError();
       _otpController.clear();
     } catch (e) {
-      setState(() { _isLoading = false; _error = e.toString(); });
+      setState(() {
+        _isLoading = false;
+        _isSuccess = false;
+        _error = e.toString();
+      });
+      _successCtrl.reset();
       _shakeOnError();
     }
   }
@@ -199,7 +246,8 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     await AuthService.instance.sendOtp(
       phoneNumber: widget.phone,
       onCodeSent: (vId, _) {
-        if (mounted) AppTheme.showSnack(context, 'OTP resent!', isSuccess: true);
+        if (mounted)
+          AppTheme.showSnack(context, 'OTP resent!', isSuccess: true);
       },
       onError: (err) {
         if (mounted) AppTheme.showSnack(context, err, isError: true);
@@ -225,38 +273,45 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light,
       ),
-      child: Scaffold(
-        backgroundColor: AppTheme.background,
-        body: Column(
-          children: [
-            // ── Decorative Header ─────────────────────────────────────
-            _buildHeader(context),
-  
-            // ── Content ───────────────────────────────────────────────
-            Expanded(
-              child: FadeTransition(
-                opacity: _fadeAnim,
-                child: SlideTransition(
-                  position: _slideAnim,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildTitleSection(context),
-                        const SizedBox(height: 36),
-                        _buildOtpSection(),
-                        const SizedBox(height: 28),
-                        _buildResendSection(context),
-                        const SizedBox(height: 32),
-                        _buildVerifyButton(context),
-                      ],
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          _goBack();
+        },
+        child: Scaffold(
+          backgroundColor: AppTheme.background,
+          body: Column(
+            children: [
+              // ── Decorative Header ─────────────────────────────────────
+              _buildHeader(context),
+
+              // ── Content ───────────────────────────────────────────────
+              Expanded(
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: SlideTransition(
+                    position: _slideAnim,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildTitleSection(context),
+                          const SizedBox(height: 36),
+                          _buildOtpSection(),
+                          const SizedBox(height: 28),
+                          _buildResendSection(context),
+                          const SizedBox(height: 32),
+                          _buildVerifyButton(context),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -280,9 +335,11 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
           children: [
             // Decorative circles
             Positioned(
-              top: -40, right: -30,
+              top: -40,
+              right: -30,
               child: Container(
-                width: 160, height: 160,
+                width: 160,
+                height: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withValues(alpha: 0.06),
@@ -290,9 +347,11 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
               ),
             ),
             Positioned(
-              bottom: -20, left: 20,
+              bottom: -20,
+              left: 20,
               child: Container(
-                width: 100, height: 100,
+                width: 100,
+                height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withValues(alpha: 0.05),
@@ -303,17 +362,27 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
             // Back button
             SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
+                  onTap: _goBack,
                   child: Container(
-                    width: 40, height: 40,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.25),
+                      ),
                     ),
-                    child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                    child: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
@@ -327,19 +396,28 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                 children: [
                   // Shield / OTP icon with glow ring
                   Container(
-                    width: 72, height: 72,
+                    width: 72,
+                    height: 72,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white.withValues(alpha: 0.15),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        width: 1.5,
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: AppTheme.primaryMint.withValues(alpha: 0.4),
-                          blurRadius: 24, spreadRadius: 4,
+                          blurRadius: 24,
+                          spreadRadius: 4,
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.verified_rounded, color: Colors.white, size: 34),
+                    child: const Icon(
+                      Icons.verified_rounded,
+                      color: Colors.white,
+                      size: 34,
+                    ),
                   ),
                   const SizedBox(height: 14),
                   const Text(
@@ -388,7 +466,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
         ),
         const SizedBox(height: 4),
         GestureDetector(
-          onTap: () => Navigator.pop(context),
+          onTap: _goBack,
           child: const Text(
             'Wrong number?',
             style: TextStyle(
@@ -406,16 +484,16 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
   Widget _buildOtpSection() {
     // Shake offset based on animation
-    final shakeOffset = _shakeAnim.value == 0
-        ? 0.0
-        : math.sin(_shakeAnim.value * math.pi * 4) * 10;
+    final shakeOffset =
+        _shakeAnim.value == 0
+            ? 0.0
+            : math.sin(_shakeAnim.value * math.pi * 4) * 10;
 
     return AnimatedBuilder(
       animation: _shakeAnim,
-      builder: (_, child) => Transform.translate(
-        offset: Offset(shakeOffset, 0),
-        child: child,
-      ),
+      builder:
+          (_, child) =>
+              Transform.translate(offset: Offset(shakeOffset, 0), child: child),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -433,16 +511,33 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
               ),
               if (_isSuccess)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.primaryLight,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 13),
-                    SizedBox(width: 4),
-                    Text('Verified', style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700)),
-                  ]),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: AppTheme.primary,
+                        size: 13,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Verified',
+                        style: TextStyle(
+                          color: AppTheme.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),
@@ -459,41 +554,54 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
           // Error message
           AnimatedSize(
             duration: const Duration(milliseconds: 200),
-            child: _error != null
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF2F2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.error.withValues(alpha: 0.2)),
-                      ),
-                      child: Row(children: [
-                        Container(
-                          width: 28, height: 28,
-                          decoration: BoxDecoration(
-                            color: AppTheme.error.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.close_rounded, color: AppTheme.error, size: 16),
+            child:
+                _error != null
+                    ? Padding(
+                      padding: const EdgeInsets.only(top: 14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _error!,
-                            style: const TextStyle(
-                              color: AppTheme.error,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              height: 1.4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppTheme.error.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: AppTheme.error.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                color: AppTheme.error,
+                                size: 16,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: AppTheme.error,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ]),
-                    ),
-                  )
-                : const SizedBox.shrink(),
+                      ),
+                    )
+                    : const SizedBox.shrink(),
           ),
         ],
       ),
@@ -502,54 +610,67 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
   Widget _buildResendSection(BuildContext context) {
     return Center(
-      child: _canResend
-          ? GestureDetector(
-              onTap: _resend,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryLight,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.refresh_rounded, color: AppTheme.primary, size: 16),
-                  const SizedBox(width: 8),
-                  Text(
-                    context.t('resendOtp'),
-                    style: const TextStyle(
-                      color: AppTheme.primary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+      child:
+          _canResend
+              ? GestureDetector(
+                onTap: _resend,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.primary.withValues(alpha: 0.3),
                     ),
                   ),
-                ]),
-              ),
-            )
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                RichText(
-                  text: TextSpan(
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppTheme.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      TextSpan(text: context.t('resendIn')),
-                      TextSpan(
-                        text: ' ${_resendTimer}s',
+                      const Icon(
+                        Icons.refresh_rounded,
+                        color: AppTheme.primary,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        context.t('resendOtp'),
                         style: const TextStyle(
                           color: AppTheme.primary,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              )
+              : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      children: [
+                        TextSpan(text: context.t('resendIn')),
+                        TextSpan(
+                          text: ' ${_resendTimer}s',
+                          style: const TextStyle(
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
     );
   }
 
@@ -574,7 +695,11 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
               SizedBox(width: 10),
               Text(
                 'Verified!',
-                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
           ),
@@ -623,13 +748,16 @@ class _CustomOtpInputState extends State<CustomOtpInput> {
   void initState() {
     super.initState();
     _focusNodes = List.generate(widget.length, (index) => FocusNode());
-    _controllers = List.generate(widget.length, (index) => TextEditingController());
-    
+    _controllers = List.generate(
+      widget.length,
+      (index) => TextEditingController(),
+    );
+
     if (widget.controller != null) {
       widget.controller!.addListener(_handleExternalControllerChange);
     }
   }
-  
+
   void _handleExternalControllerChange() {
     if (widget.controller!.text.isEmpty) {
       for (var c in _controllers) {
@@ -676,7 +804,7 @@ class _CustomOtpInputState extends State<CustomOtpInput> {
     }
     _updateExternalController();
   }
-  
+
   void _updateExternalController() {
     if (widget.controller != null) {
       String otp = _controllers.map((c) => c.text).join();
@@ -709,7 +837,8 @@ class _CustomOtpInputState extends State<CustomOtpInput> {
       height: 64,
       child: Focus(
         onKeyEvent: (node, event) {
-          if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.backspace) {
             if (_controllers[index].text.isEmpty && index > 0) {
               _focusNodes[index - 1].requestFocus();
               _controllers[index - 1].clear();
@@ -724,13 +853,13 @@ class _CustomOtpInputState extends State<CustomOtpInput> {
           builder: (context, child) {
             final isFocused = _focusNodes[index].hasFocus;
             final hasValue = _controllers[index].text.isNotEmpty;
-            
+
             Color borderColor = AppTheme.border;
             Color bgColor = Colors.white;
             double borderWidth = 1.5;
             Color textColor = AppTheme.textPrimary;
             List<BoxShadow>? shadows;
-            
+
             if (widget.isError) {
               borderColor = AppTheme.error;
               bgColor = const Color(0xFFFEF2F2);

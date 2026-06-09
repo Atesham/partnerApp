@@ -1,16 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/l10n/app_localizations.dart';
 import 'core/providers/partner_provider.dart';
+import 'core/services/notification_service.dart';
 import 'features/splash/presentation/splash_screen.dart';
 
-void main() {
+import 'features/compliance/presentation/policy_detail_screen.dart';
+
+// Global navigation key to support notification clicks from everywhere
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Set system UI BEFORE async work — this removes the blank white frame
-  // that appears between app launch and the splash screen.
+  // Initialize Firebase on App Launch
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -26,6 +37,9 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Initialize notifications
+  await NotificationService.instance.init(navigatorKey);
+
   runApp(const ScrapwellPartnerApp());
 }
 
@@ -38,6 +52,7 @@ class ScrapwellPartnerApp extends StatelessWidget {
       valueListenable: localeNotifier,
       builder: (context, lang, _) {
         return MaterialApp(
+          navigatorKey: navigatorKey, // Assign the global navigator key
           title: 'Scrapwell Partner',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
@@ -49,7 +64,18 @@ class ScrapwellPartnerApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: const SplashScreen(),
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const SplashScreen(),
+            '/terms': (context) => const PolicyDetailScreen(
+                  policyKey: 'terms',
+                  title: 'Terms & Conditions',
+                ),
+            '/privacy': (context) => const PolicyDetailScreen(
+                  policyKey: 'privacy',
+                  title: 'Privacy Policy',
+                ),
+          },
         );
       },
     );

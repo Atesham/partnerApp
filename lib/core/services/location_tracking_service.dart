@@ -199,6 +199,22 @@ class LocationTrackingService {
         updates['assignedOrderId'] = null;
       }
 
+      if (isOnline) {
+        final partner = PartnerProvider().partner;
+        final lat = partner.currentLat != 0.0 ? partner.currentLat : partner.shopLat;
+        final lng = partner.currentLng != 0.0 ? partner.currentLng : partner.shopLng;
+        updates['maxDistanceKm'] = partner.maxDistanceKm;
+
+        if (lat != 0.0 && lng != 0.0) {
+          updates['latitude'] = lat;
+          updates['longitude'] = lng;
+          updates['position'] = {
+            'geohash': _geohash(lat, lng),
+            'geopoint': GeoPoint(lat, lng),
+          };
+        }
+      }
+
       await _db
           .collection('live_locations')
           .doc(uid)

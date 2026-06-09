@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../core/services/auth_service.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
@@ -433,6 +434,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         curve: Curves.easeInOutCubic,
       );
     } else {
+      AuthService.instance.signOut();
       Navigator.pop(context);
     }
   }

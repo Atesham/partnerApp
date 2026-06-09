@@ -69,8 +69,12 @@ class AuthService {
   }
 
   Future<bool> isPartnerRegistered(String uid) async {
-    final doc = await _db.collection('partners').doc(uid).get();
-    return doc.exists;
+    try {
+      final doc = await _db.collection('partners').doc(uid).get();
+      return doc.exists;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> signOut() async {

@@ -8,7 +8,7 @@ import '../services/location_tracking_service.dart';
 
 /// Instant pickup radius hard cap — orders beyond this are never shown
 /// regardless of the partner's configured maxDistanceKm.
-const double kInstantPickupMaxRadiusKm = 10.0;
+const double kInstantPickupMaxRadiusKm = 30.0;
 
 /// Buffer between scheduled pickups (minutes). A partner won't be assigned
 /// a new slot if another slot exists within this window.
@@ -51,8 +51,8 @@ class LeadService {
       return snap.docs
           .map((d) => OrderModel.fromJson(d.data()))
           .where((order) {
-            // Exclude expired orders
-            if (order.expiresAt != null && now.isAfter(order.expiresAt!)) {
+            // Exclude expired orders (allowing a 5-minute buffer for client-server clock skew)
+            if (order.expiresAt != null && now.isAfter(order.expiresAt!.add(const Duration(minutes: 5)))) {
               return false;
             }
             // Scrap Category Filter — partner must accept at least one of the order's categories
@@ -117,10 +117,10 @@ class LeadService {
           throw Exception('Order already taken');
         }
 
-        // Check expiry
+        // Check expiry (allowing a 5-minute buffer for client-server clock skew)
         if (orderData['expiresAt'] != null) {
           final expiresAt = (orderData['expiresAt'] as Timestamp).toDate();
-          if (DateTime.now().isAfter(expiresAt)) {
+          if (DateTime.now().isAfter(expiresAt.add(const Duration(minutes: 5)))) {
             throw Exception('Order expired');
           }
         }

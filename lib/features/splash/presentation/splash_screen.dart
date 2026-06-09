@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../firebase_options.dart';
 import '../../../core/providers/partner_provider.dart';
+import '../../../core/services/notification_service.dart';
 import '../../language/presentation/language_selection_screen.dart';
 import '../../main/presentation/main_screen.dart';
 import '../../registration/presentation/registration_screen.dart';
 import '../../registration/presentation/pending_approval_screen.dart';
+import '../../auth/presentation/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -22,6 +25,7 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _fadeAnim;
   late Animation<double> _scaleAnim;
   late Animation<Offset> _slideAnim;
+  String? _error;
 
   @override
   void initState() {
@@ -59,33 +63,50 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigate() async {
-    // Run the minimum display time and auth check in parallel
-    final results = await Future.wait([
-      Future.delayed(const Duration(milliseconds: 1400)),
-      _checkAuthStatus(),
-    ]);
+    setState(() => _error = null);
+    try {
+      final results = await Future.wait([
+        Future.delayed(const Duration(milliseconds: 1400)),
+        _checkAuthStatus(),
+      ]);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    final route = results[1] as Widget;
-    _push(route);
+      final route = results[1];
+      if (route is Widget) {
+        _push(route);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = e.toString());
+      }
+    }
   }
 
   Future<Widget> _checkAuthStatus() async {
-    // Initialize Firebase in the background (during animation)
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
     // Load saved locale
     await initLocale();
 
+    final prefs = await SharedPreferences.getInstance();
+    final hasLanguage = prefs.containsKey('language');
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
+      if (hasLanguage) {
+        return const LoginScreen();
+      }
       return const LanguageSelectionScreen();
     }
 
     final partner = PartnerProvider();
     await partner.loadPartner();
+
+    if (partner.error != null) {
+      throw Exception(partner.error);
+    }
+
+    // Update FCM Push Token on login
+    await NotificationService.instance.updateFcmToken();
 
     if (!partner.hasProfile) {
       return const RegistrationScreen();
@@ -258,32 +279,61 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
 
-            // Bottom loading
+            // Bottom loading / error retry
             Positioned(
               bottom: 60,
-              left: 0,
-              right: 0,
+              left: 24,
+              right: 24,
               child: FadeTransition(
                 opacity: _fadeAnim,
                 child: Column(
                   children: [
-                    SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(
-                        color: Colors.white.withOpacity(0.7),
-                        strokeWidth: 2.5,
+                    if (_error != null) ...[
+                      Text(
+                        _error!.contains('network') || _error!.contains('Unavailable') || _error!.contains('connection')
+                            ? 'Connection error. Please check your internet connection.'
+                            : _error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Powered by Scrapwell',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
+                      const SizedBox(height: 14),
+                      ElevatedButton.icon(
+                        onPressed: _navigate,
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        label: const Text('Retry'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFF064E3B),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        ),
                       ),
-                    ),
+                    ] else ...[
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          color: Colors.white.withOpacity(0.7),
+                          strokeWidth: 2.5,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Powered by Scrapwell',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.4),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

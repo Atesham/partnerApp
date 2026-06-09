@@ -20,6 +20,8 @@ class OrderTrackingScreen extends StatefulWidget {
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   final _orders = OrderProvider();
   OrderModel? _order;
+  // Named listener reference so we can safely remove it in dispose()
+  late final VoidCallback _orderListener;
 
   @override
   void initState() {
@@ -29,23 +31,38 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   @override
   void dispose() {
+    _orders.removeListener(_orderListener);
     super.dispose();
   }
 
   void _loadOrder() {
-    _orders.listenToOrders();
-    _orders.addListener(() {
-      if (mounted) {
-        final o = _orders.activeOrders
-            .where((o) => o.orderId == widget.orderId)
-            .firstOrNull;
-        if (o != null) setState(() => _order = o);
-      }
-    });
-    final o = _orders.activeOrders
-        .where((o) => o.orderId == widget.orderId)
-        .firstOrNull;
-    if (o != null) setState(() => _order = o);
+    // Define the listener as a named reference BEFORE attaching it, so
+    // we can safely remove it in dispose() — fixes the anonymous-listener leak.
+    _orderListener = () {
+      if (!mounted) return;
+      // Check all list types so the screen stays updated across all states
+      final o = _findOrder();
+      if (o != null) setState(() => _order = o);
+    };
+
+    // Attach listener FIRST, then start the stream so we never miss the
+    // first emission (fixes the race condition / blank skeleton bug).
+    _orders.addListener(_orderListener);
+
+    // The singleton may already have data — do an immediate lookup.
+    final existing = _findOrder();
+    if (existing != null) setState(() => _order = existing);
+  }
+
+  /// Search across all order lists on the singleton so we find the order
+  /// regardless of whether it's active, reserved, completed, or cancelled.
+  OrderModel? _findOrder() {
+    return [
+      ..._orders.activeOrders,
+      ..._orders.reservedOrders,
+      ..._orders.completedOrders,
+      ..._orders.cancelledOrders,
+    ].where((o) => o.orderId == widget.orderId).firstOrNull;
   }
 
   Future<void> _updateStatus(OrderStatus status) async {
@@ -309,9 +326,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     );
 
     try {
-      final batch = FirebaseFirestore.instance.batch();
-      final orderRef = FirebaseFirestore.instance.collection('orders').doc(order.orderId);
-      final partnerRef = FirebaseFirestore.instance.collection('partners').doc(uid);
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
+      final orderRef = db.collection('orders').doc(order.orderId);
+      final partnerRef = db.collection('partners').doc(uid);
+      final liveLocRef = db.collection('live_locations').doc(uid);
 
       // 1. Release the order back to searchingPartner in Firestore
       batch.update(orderRef, {
@@ -323,14 +342,28 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         'partnerPhone': null,
         'partnerShopName': null,
         'assignedAt': null,
+        'updatedAt': FieldValue.serverTimestamp(),
         'expiresAt': Timestamp.fromDate(DateTime.now().add(const Duration(minutes: 2))),
       });
 
-      // 2. Mark the partner as available
+      // 2. Mark the partner as available in partners collection
       batch.update(partnerRef, {
         'isAvailable': true,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // 3. CRITICAL: Also restore availability in live_locations so the partner
+      //    immediately re-enters the instant pickup broadcast pool.
+      //    Without this, the partner stays "on another order" indefinitely.
+      batch.set(
+        liveLocRef,
+        {
+          'isAvailable': true,
+          'assignedOrderId': null,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
 
       await batch.commit();
 

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/partner_model.dart';
 import '../services/location_tracking_service.dart';
+import '../services/notification_service.dart';
 
 class PartnerProvider extends ChangeNotifier {
   static final PartnerProvider _instance = PartnerProvider._internal();
@@ -76,8 +77,10 @@ class PartnerProvider extends ChangeNotifier {
           await toggleOnline(false);
         } else if (_isOnline) {
           LocationTrackingService.instance.startTracking();
+          NotificationService.instance.startLocalLeadListener(_partner);
         } else {
           LocationTrackingService.instance.stopTracking();
+          NotificationService.instance.stopLocalLeadListener();
         }
         notifyListeners();
       }
@@ -110,20 +113,37 @@ class PartnerProvider extends ChangeNotifier {
       // ── 2. Immediately mirror online/availability into live_locations ──
       // This ensures instant-pickup broadcasts stop reaching this partner
       // the moment they go offline — without waiting for the next GPS tick.
-      await _db.collection('live_locations').doc(uid).set({
+      final updates = <String, dynamic>{
         'isOnline': online,
         'isAvailable': online,
         'updatedAt': FieldValue.serverTimestamp(),
         // Cache radius so instant-pickup filter reads it from live_locations
         'maxDistanceKm': _partner.maxDistanceKm,
         if (!online) 'assignedOrderId': null,
-      }, SetOptions(merge: true));
+      };
+
+      if (online) {
+        final lat = _partner.currentLat != 0.0 ? _partner.currentLat : _partner.shopLat;
+        final lng = _partner.currentLng != 0.0 ? _partner.currentLng : _partner.shopLng;
+        if (lat != 0.0 && lng != 0.0) {
+          updates['latitude'] = lat;
+          updates['longitude'] = lng;
+          updates['position'] = {
+            'geohash': '${lat.toStringAsFixed(3)}_${lng.toStringAsFixed(3)}',
+            'geopoint': GeoPoint(lat, lng),
+          };
+        }
+      }
+
+      await _db.collection('live_locations').doc(uid).set(updates, SetOptions(merge: true));
 
       _error = null;
       if (online) {
         await LocationTrackingService.instance.startTracking();
+        NotificationService.instance.startLocalLeadListener(_partner);
       } else {
         LocationTrackingService.instance.stopTracking();
+        NotificationService.instance.stopLocalLeadListener();
       }
     } catch (e) {
       _isOnline = !online;
@@ -170,11 +190,46 @@ class PartnerProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _db
-          .collection('partners')
-          .doc(partner.uid)
-          .set(partner.toJson());
-      _partner = partner;
+      final docRef = _db.collection('partners').doc(partner.uid);
+
+      final registrationData = {
+        'uid': partner.uid,
+        'phone': partner.phone,
+        'fullName': partner.fullName,
+        'shopName': partner.shopName,
+        'shopAddress': partner.shopAddress,
+        'exactShopAddress': partner.exactShopAddress,
+        'shopLat': partner.shopLat,
+        'shopLng': partner.shopLng,
+        'currentLat': partner.shopLat,
+        'currentLng': partner.shopLng,
+        'isOnline': false,
+        'scrapCategories': partner.scrapCategories,
+        'profilePhotoUrl': partner.profilePhotoUrl,
+        'shopPhotoUrl': partner.shopPhotoUrl,
+        'gstNumber': partner.gstNumber,
+        'aadhaarNumber': partner.aadhaarNumber,
+        'aadhaarFrontUrl': partner.aadhaarFrontUrl,
+        'aadhaarBackUrl': partner.aadhaarBackUrl,
+        'vehicleTypes': partner.vehicleTypes.map((e) => e.name).toList(),
+        'workingHoursStart': partner.workingHoursStart,
+        'workingHoursEnd': partner.workingHoursEnd,
+        'status': partner.status.name, // 'pending'
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'position': {
+          'geohash': '${partner.shopLat.toStringAsFixed(3)}_${partner.shopLng.toStringAsFixed(3)}',
+          'geopoint': GeoPoint(partner.shopLat, partner.shopLng),
+        },
+      };
+
+      await docRef.set(registrationData, SetOptions(merge: true));
+
+      await loadPartner();
+      
+      // Update FCM push token for the newly created profile
+      await NotificationService.instance.updateFcmToken();
+
       _error = null;
       return true;
     } catch (e) {
@@ -322,6 +377,22 @@ class PartnerProvider extends ChangeNotifier {
         shopLng: lng,
         addressVerified: true,
       );
+
+      if (_isOnline) {
+        final currentLat = _partner.currentLat != 0.0 ? _partner.currentLat : lat;
+        final currentLng = _partner.currentLng != 0.0 ? _partner.currentLng : lng;
+
+        await _db.collection('live_locations').doc(uid).set({
+          'latitude': currentLat,
+          'longitude': currentLng,
+          'position': {
+            'geohash': '${currentLat.toStringAsFixed(3)}_${currentLng.toStringAsFixed(3)}',
+            'geopoint': GeoPoint(currentLat, currentLng),
+          },
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
       _error = null;
       return true;
     } catch (e) {
@@ -425,10 +496,21 @@ class PartnerProvider extends ChangeNotifier {
       // Instant-pickup stream reads maxDistanceKm from live_locations to
       // avoid a second collection read. Keep them in sync on every change.
       if (_isOnline) {
-        await _db.collection('live_locations').doc(uid).set({
+        final lat = _partner.currentLat != 0.0 ? _partner.currentLat : _partner.shopLat;
+        final lng = _partner.currentLng != 0.0 ? _partner.currentLng : _partner.shopLng;
+        final updates = <String, dynamic>{
           'maxDistanceKm': km,
           'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        };
+        if (lat != 0.0 && lng != 0.0) {
+          updates['latitude'] = lat;
+          updates['longitude'] = lng;
+          updates['position'] = {
+            'geohash': '${lat.toStringAsFixed(3)}_${lng.toStringAsFixed(3)}',
+            'geopoint': GeoPoint(lat, lng),
+          };
+        }
+        await _db.collection('live_locations').doc(uid).set(updates, SetOptions(merge: true));
       }
 
       _partner = _partner.copyWith(maxDistanceKm: km);
@@ -440,6 +522,7 @@ class PartnerProvider extends ChangeNotifier {
     _partnerSub?.cancel();
     _partnerSub = null;
     LocationTrackingService.instance.stopTracking();
+    NotificationService.instance.stopLocalLeadListener();
     _partner = PartnerModel.empty();
     _isOnline = false;
     _isLoading = false;

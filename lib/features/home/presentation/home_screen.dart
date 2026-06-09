@@ -29,6 +29,9 @@ class _HomeScreenState extends State<HomeScreen> {
   OrderModel? _incomingOrder;
   bool _leadPopupShown = false;
   StreamSubscription<List<OrderModel>>? _leadsSub;
+  List<OrderModel> _nearbyOrders = [];
+  bool _isLeadsLoading = true;
+  final Set<String> _declinedOrderIds = {};
 
   double get _partnerLat => _partner.partner.currentLat != 0.0
       ? _partner.partner.currentLat
@@ -93,12 +96,22 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       _leadsSub?.cancel();
       _leadsSub = null;
+      setState(() {
+        _nearbyOrders = [];
+        _isLeadsLoading = false;
+      });
     }
   }
 
   void _listenToLeads() {
     _leadsSub?.cancel();
-    if (!_partner.isOnline) return;
+    if (!_partner.isOnline) {
+      setState(() {
+        _nearbyOrders = [];
+        _isLeadsLoading = false;
+      });
+      return;
+    }
 
     // Use instantPickupStream — broadcasts ALL in-radius instant orders simultaneously.
     // The partner's current location and maxDistanceKm are read from the partner model.
@@ -107,10 +120,18 @@ class _HomeScreenState extends State<HomeScreen> {
         .listen((orders) {
       if (!mounted) return;
 
+      // Filter out declined/ignored orders
+      final visibleOrders = orders.where((o) => !_declinedOrderIds.contains(o.orderId)).toList();
+
+      setState(() {
+        _nearbyOrders = visibleOrders;
+        _isLeadsLoading = false;
+      });
+
       // If popup is shown but the order was taken (no longer in stream), auto-close
       if (_leadPopupShown && _incomingOrder != null) {
         final stillAvailable =
-            orders.any((o) => o.orderId == _incomingOrder!.orderId);
+            visibleOrders.any((o) => o.orderId == _incomingOrder!.orderId);
         if (!stillAvailable) {
           if (Navigator.of(context).canPop()) {
             Navigator.of(context).pop();
@@ -123,16 +144,22 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      if (orders.isEmpty || _leadPopupShown) return;
+      if (visibleOrders.isEmpty || _leadPopupShown) return;
 
       // Show the nearest unviewed order as a popup
-      final order = orders.first;
+      final order = visibleOrders.first;
       if (_incomingOrder?.orderId == order.orderId) return;
       setState(() {
         _incomingOrder = order;
         _leadPopupShown = true;
       });
       _showLeadPopup(order);
+    }, onError: (err) {
+      if (mounted) {
+        setState(() {
+          _isLeadsLoading = false;
+        });
+      }
     });
   }
 
@@ -150,6 +177,8 @@ class _HomeScreenState extends State<HomeScreen> {
             onAccepted: () => setState(() => _leadPopupShown = false),
             onDeclined:
                 () => setState(() {
+                  _declinedOrderIds.add(order.orderId);
+                  _nearbyOrders.removeWhere((o) => o.orderId == order.orderId);
                   _incomingOrder = null;
                   _leadPopupShown = false;
                 }),
@@ -594,34 +623,30 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildLeadFeed(BuildContext context) {
     if (!_partner.isOnline) return _buildOfflineEmptyState();
 
-    return StreamBuilder<List<OrderModel>>(
-      // Use instantPickupStream — partner sees ALL orders in their radius simultaneously.
-      // The stream is already filtered and sorted by distance.
-      stream: LeadService.instance.instantPickupStream(_partner.partner),
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Column(
-            children: [SkeletonLeadCard(), SkeletonLeadCard()],
-          );
-        }
+    if (_isLeadsLoading) {
+      return const Column(
+        children: [SkeletonLeadCard(), SkeletonLeadCard()],
+      );
+    }
 
-        final orders = snap.data ?? [];
+    if (_nearbyOrders.isEmpty) return _buildEmptyLeadState();
 
-        if (orders.isEmpty) return _buildEmptyLeadState();
-
-        return Column(
-          children: orders
-              .map(
-                (order) => LeadFeedCard(
-                  order: order,
-                  partner: _partner.partner,
-                  onAccept: () => _showLeadPopup(order),
-                  onIgnore: () {},
-                ),
-              )
-              .toList(),
-        );
-      },
+    return Column(
+      children: _nearbyOrders
+          .map(
+            (order) => LeadFeedCard(
+              order: order,
+              partner: _partner.partner,
+              onAccept: () => _showLeadPopup(order),
+              onIgnore: () {
+                setState(() {
+                  _declinedOrderIds.add(order.orderId);
+                  _nearbyOrders.removeWhere((o) => o.orderId == order.orderId);
+                });
+              },
+            ),
+          )
+          .toList(),
     );
   }
 

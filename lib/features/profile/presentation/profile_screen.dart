@@ -12,7 +12,7 @@ import '../../compliance/presentation/safety_center_screen.dart';
 import '../../compliance/presentation/privacy_center_screen.dart';
 import '../../compliance/presentation/legal_hub_screen.dart';
 import '../../compliance/presentation/about_scrapwell_screen.dart';
-import '../../compliance/presentation/verification_center_screen.dart';
+
 import '../../earnings/presentation/earnings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -49,15 +49,6 @@ class ProfileScreen extends StatelessWidget {
                       
                       // Section 1: Business & Settlements
                       _buildSection(context.t('businessRelationship'), [
-                        _MenuItem(
-                          Icons.verified_user_rounded,
-                          context.t('verificationStatus'),
-                          AppTheme.primary,
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const VerificationCenterScreen()),
-                          ),
-                        ),
                         _MenuItem(
                           Icons.business_center_rounded,
                           context.t('myBusinessProfile'),
