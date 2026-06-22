@@ -66,29 +66,27 @@ class _EarningsScreenState extends State<EarningsScreen> {
         builder: (_, __) {
           return CustomScrollView(
             slivers: [
-              _buildHeader(context),
+              _buildHeader(),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Period selector
                       _buildPeriodPicker(),
-                      const SizedBox(height: 20),
-                      // Big earning number
+                      const SizedBox(height: 16),
+                      // Big earning card
                       _buildBigEarning(),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 14),
                       // Stats grid
                       _buildStatsGrid(),
-                      const SizedBox(height: 24),
-                      // Chart placeholder
-                      _buildChartSection(),
-                      const SizedBox(height: 24),
-                      // Wallet balance
-                      _buildWalletCard(),
                       const SizedBox(height: 16),
-                      _buildCommissionWalletCard(),
+                      // Performance section
+                      _buildPerformanceSection(),
+                      const SizedBox(height: 16),
+                      // Commission due — primary focus
+                      _buildCommissionDueCard(),
                       const SizedBox(height: 80),
                     ],
                   ),
@@ -101,35 +99,37 @@ class _EarningsScreenState extends State<EarningsScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  // ─────────────────────────────────────────────────────────────
+  // Header
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildHeader() {
     return SliverAppBar(
       backgroundColor: AppTheme.background,
-      floating: true, snap: true, elevation: 0,
-      title: const Text('Earnings', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppTheme.textPrimary)),
+      floating: true,
+      snap: true,
+      elevation: 0,
       titleSpacing: 20,
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 20),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: AppTheme.primaryLight, borderRadius: BorderRadius.circular(12)),
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.download_rounded, color: AppTheme.primary, size: 16),
-              SizedBox(width: 6),
-              Text('Export', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w700, fontSize: 13)),
-            ]),
-          ),
+      title: const Text(
+        'My Earnings',
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: 22,
+          color: AppTheme.textPrimary,
         ),
-      ],
+      ),
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // Period Picker
+  // ─────────────────────────────────────────────────────────────
   Widget _buildPeriodPicker() {
     final periods = ['Today', 'This Week', 'This Month'];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
         boxShadow: AppTheme.subtleShadow,
       ),
       child: Row(
@@ -145,11 +145,15 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   color: selected ? AppTheme.primary : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(periods[i],
+                child: Text(
+                  periods[i],
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w700,
-                    color: selected ? Colors.white : AppTheme.textSecondary)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : AppTheme.textSecondary,
+                  ),
+                ),
               ),
             ),
           );
@@ -158,6 +162,9 @@ class _EarningsScreenState extends State<EarningsScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // Big Earning Hero Card
+  // ─────────────────────────────────────────────────────────────
   Widget _buildBigEarning() {
     final value = _selectedPeriod == 0
         ? _earnings.todayEarnings
@@ -169,73 +176,184 @@ class _EarningsScreenState extends State<EarningsScreen> {
         : _selectedPeriod == 1
             ? _earnings.weekOrders
             : _earnings.monthOrders;
+    final periodLabel = ['Today', 'This Week', 'This Month'][_selectedPeriod];
 
-    return _earnings.isLoading
-        ? const SkeletonBox(width: double.infinity, height: 120, radius: 20)
-        : Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF064E3B), Color(0xFF059669)],
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: AppTheme.elevatedShadow,
-            ),
-            child: Row(
+    if (_earnings.isLoading) {
+      return const SkeletonBox(width: double.infinity, height: 110, radius: 20);
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF064E3B), Color(0xFF059669)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppTheme.elevatedShadow,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Total Earned', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  Text('₹${value.toStringAsFixed(0)}',
-                    style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 4),
-                  Text('$orders pickups completed', style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                ])),
-                Container(
-                  width: 60, height: 60,
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(16)),
-                  child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 30),
+                Text(
+                  'Earned $periodLabel',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '₹${value.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 38,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '$orders pickup${orders == 1 ? '' : 's'} done',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          );
-  }
-
-  Widget _buildStatsGrid() {
-    final stats = [
-      ('₹${_earnings.todayEarnings.toStringAsFixed(0)}', 'Today', Icons.today_rounded, AppTheme.primary),
-      ('₹${_earnings.weekEarnings.toStringAsFixed(0)}', 'This Week', Icons.calendar_view_week_rounded, AppTheme.info),
-      ('${_earnings.todayOrders}', 'Today\'s Orders', Icons.inventory_2_rounded, AppTheme.warning),
-      ('${_earnings.weekOrders}', 'Week\'s Orders', Icons.bar_chart_rounded, AppTheme.error),
-    ];
-    return GridView.count(
-      crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.5,
-      children: stats.map((s) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: AppTheme.subtleShadow),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(s.$3, color: s.$4, size: 20),
-          const Spacer(),
-          Text(s.$1, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: s.$4)),
-          const SizedBox(height: 2),
-          Text(s.$2, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
-        ]),
-      )).toList(),
+          ),
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.trending_up_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildChartSection() {
-    // Show real performance metrics instead of dummy chart bars
+  // ─────────────────────────────────────────────────────────────
+  // Stats 2×2 Grid
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildStatsGrid() {
+    final stats = [
+      _StatItem(
+        icon: Icons.today_rounded,
+        label: "Today's Earnings",
+        value: '₹${_earnings.todayEarnings.toStringAsFixed(0)}',
+        color: AppTheme.primary,
+      ),
+      _StatItem(
+        icon: Icons.calendar_view_week_rounded,
+        label: "Week's Earnings",
+        value: '₹${_earnings.weekEarnings.toStringAsFixed(0)}',
+        color: AppTheme.info,
+      ),
+      _StatItem(
+        icon: Icons.inventory_2_rounded,
+        label: "Today's Orders",
+        value: '${_earnings.todayOrders}',
+        color: AppTheme.warning,
+      ),
+      _StatItem(
+        icon: Icons.bar_chart_rounded,
+        label: "Week's Orders",
+        value: '${_earnings.weekOrders}',
+        color: const Color(0xFF8B5CF6),
+      ),
+    ];
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 1.55,
+      children: stats
+          .map(
+            (s) => Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: AppTheme.subtleShadow,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: s.color.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(s.icon, color: s.color, size: 16),
+                  ),
+                  const Spacer(),
+                  Text(
+                    s.value,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: s.color,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    s.label,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Performance Section
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildPerformanceSection() {
     final avgPerOrder = _earnings.weekOrders > 0
         ? _earnings.weekEarnings / _earnings.weekOrders
         : 0.0;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(18),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
         boxShadow: AppTheme.subtleShadow,
       ),
       child: Column(
@@ -244,194 +362,306 @@ class _EarningsScreenState extends State<EarningsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Performance', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+              const Text(
+                'This Week at a Glance',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: AppTheme.primaryLight, borderRadius: BorderRadius.circular(10)),
-                child: const Text('This Week', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.w700)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'Weekly',
+                  style: TextStyle(
+                    color: AppTheme.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _performanceRow(Icons.payments_rounded, 'Avg. Per Order',
-              '₹${avgPerOrder.toStringAsFixed(0)}', AppTheme.primary),
+          const SizedBox(height: 14),
+          _performanceRow(
+            Icons.payments_rounded,
+            'Avg. Per Pickup',
+            '₹${avgPerOrder.toStringAsFixed(0)}',
+            AppTheme.primary,
+          ),
           const Divider(height: 20, color: AppTheme.divider),
-          _performanceRow(Icons.inventory_2_rounded, 'Week Pickups',
-              '${_earnings.weekOrders} orders', AppTheme.info),
+          _performanceRow(
+            Icons.inventory_2_rounded,
+            'Total Pickups',
+            '${_earnings.weekOrders} orders',
+            AppTheme.info,
+          ),
           const Divider(height: 20, color: AppTheme.divider),
-          _performanceRow(Icons.account_balance_wallet_rounded, 'Week Earnings',
-              '₹${_earnings.weekEarnings.toStringAsFixed(0)}', AppTheme.success),
+          _performanceRow(
+            Icons.account_balance_wallet_rounded,
+            'Total Earned',
+            '₹${_earnings.weekEarnings.toStringAsFixed(0)}',
+            AppTheme.success,
+          ),
         ],
       ),
     );
   }
 
-  Widget _performanceRow(IconData icon, String label, String value, Color color) {
+  Widget _performanceRow(
+      IconData icon, String label, String value, Color color) {
     return Row(
       children: [
         Container(
-          width: 36, height: 36,
-          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
           child: Icon(icon, color: color, size: 18),
         ),
         const SizedBox(width: 12),
-        Expanded(child: Text(label, style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary, fontWeight: FontWeight.w500))),
-        Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color)),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
       ],
     );
   }
 
-
-  Widget _buildWalletCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(18),
-        boxShadow: AppTheme.subtleShadow,
-        border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52, height: 52,
-            decoration: BoxDecoration(color: AppTheme.primaryLight, borderRadius: BorderRadius.circular(14)),
-            child: const Icon(Icons.account_balance_wallet_rounded, color: AppTheme.primary, size: 26),
-          ),
-          const SizedBox(width: 16),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Wallet Balance', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 2),
-            Text('₹${_earnings.walletBalance.toStringAsFixed(0)}',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textPrimary)),
-          ])),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(color: AppTheme.primaryLight, borderRadius: BorderRadius.circular(12)),
-            child: const Text('Withdraw', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w700, fontSize: 14)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCommissionWalletCard() {
+  // ─────────────────────────────────────────────────────────────
+  // Commission Due Card — Primary Focus
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildCommissionDueCard() {
     final dueAt = _earnings.commissionDueAt;
     final dueText = dueAt == null
         ? 'Every Tuesday'
         : '${dueAt.day}/${dueAt.month}/${dueAt.year}';
     final blocked = _earnings.shouldBlockForCommission;
+    final hasDue = _earnings.hasCommissionDue;
+
+    // Colour scheme: red if blocked, amber if due, green if clear
+    final Color accentColor = blocked
+        ? AppTheme.error
+        : hasDue
+            ? AppTheme.warning
+            : AppTheme.success;
+    final Color bgColor = blocked
+        ? const Color(0xFFFEF2F2)
+        : hasDue
+            ? const Color(0xFFFFFBEB)
+            : AppTheme.primaryLight;
+    final IconData headerIcon = blocked
+        ? Icons.lock_clock_rounded
+        : hasDue
+            ? Icons.receipt_long_rounded
+            : Icons.check_circle_rounded;
 
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: AppTheme.subtleShadow,
-        border: Border.all(
-          color: blocked
-              ? AppTheme.error.withOpacity(0.2)
-              : AppTheme.warning.withOpacity(0.2),
-        ),
+        border: Border.all(color: accentColor.withOpacity(0.25), width: 1.5),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: blocked
-                      ? const Color(0xFFFEF2F2)
-                      : const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  blocked
-                      ? Icons.lock_clock_rounded
-                      : Icons.receipt_long_rounded,
-                  color: blocked ? AppTheme.error : AppTheme.warning,
-                  size: 26,
-                ),
+          // ── Status Banner ───────────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(19),
+                topRight: Radius.circular(19),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            child: Row(
+              children: [
+                Icon(headerIcon, color: accentColor, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    blocked
+                        ? 'Account Blocked – Pay commission to continue'
+                        : hasDue
+                            ? 'Commission payment pending'
+                            : 'No commission due – You\'re all clear!',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: accentColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Amount + Details ────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Due amount hero
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text(
-                      'Scrapwell Commission Wallet',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.textSecondary,
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Due Balance',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '₹${_earnings.commissionDueBalance.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w900,
+                              color: hasDue
+                                  ? accentColor
+                                  : AppTheme.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Rs ${_earnings.commissionDueBalance.toStringAsFixed(0)} due',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: blocked ? AppTheme.error : AppTheme.textPrimary,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: accentColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        hasDue ? 'PAY NOW' : 'CLEAR',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: accentColor,
+                          letterSpacing: 0.8,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _commissionInfoRow('Rate', '2% of completed order bill'),
-          const Divider(height: 18, color: AppTheme.divider),
-          _commissionInfoRow('Pay by', dueText),
-          const Divider(height: 18, color: AppTheme.divider),
-          _commissionInfoRow('UPI ID', _earnings.scrapwellUpiId),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed:
-                  _earnings.commissionDueBalance > 0 ? _payCommission : null,
-              icon: const Icon(Icons.payment_rounded, size: 18),
-              label: const Text('Pay Commission'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                minimumSize: const Size(0, 46),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+
+                const SizedBox(height: 16),
+                const Divider(height: 1, color: AppTheme.divider),
+                const SizedBox(height: 14),
+
+                // Info rows
+                _infoRow(Icons.percent_rounded, 'Commission Rate',
+                    '2% of each completed order'),
+                const SizedBox(height: 10),
+                _infoRow(Icons.calendar_today_rounded, 'Pay By', dueText),
+                const SizedBox(height: 10),
+                _infoRow(Icons.account_balance_rounded, 'UPI ID',
+                    _earnings.scrapwellUpiId),
+
+                const SizedBox(height: 18),
+
+                // Pay button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed:
+                        hasDue ? _payCommission : null,
+                    icon: const Icon(Icons.payment_rounded, size: 18),
+                    label: Text(
+                      hasDue
+                          ? 'Pay ₹${_earnings.commissionDueBalance.toStringAsFixed(0)} via UPI'
+                          : 'Nothing to Pay',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentColor,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor:
+                          AppTheme.primary.withOpacity(0.3),
+                      disabledForegroundColor: Colors.white70,
+                      elevation: 0,
+                      minimumSize: const Size(0, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _confirmCommissionOnWhatsApp,
-              icon: const Icon(Icons.chat_rounded, size: 18),
-              label: const Text('I paid, notify Scrapwell on WhatsApp'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.primary,
-                side: const BorderSide(color: AppTheme.primary),
-                minimumSize: const Size(0, 44),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+
+                const SizedBox(height: 8),
+
+                // WhatsApp confirm button (only shown when due)
+                if (hasDue)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _confirmCommissionOnWhatsApp,
+                      icon: const Icon(Icons.chat_rounded, size: 18),
+                      label: const Text('Already paid? Notify on WhatsApp'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        side: const BorderSide(color: AppTheme.primary),
+                        minimumSize: const Size(0, 46),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                if (hasDue) const SizedBox(height: 12),
+
+                // Footnote
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline_rounded,
+                        size: 13, color: AppTheme.textHint),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Payment opens in your UPI app. '
+                        'Due balance is cleared after Scrapwell verifies the transfer.',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textHint,
+                          height: 1.4,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Payment opens in any installed UPI app. Dues are cleared after Scrapwell verifies the transfer.',
-            style: TextStyle(
-              fontSize: 11,
-              color: AppTheme.textSecondary,
-              height: 1.4,
-              fontWeight: FontWeight.w600,
+              ],
             ),
           ),
         ],
@@ -439,15 +669,17 @@ class _EarningsScreenState extends State<EarningsScreen> {
     );
   }
 
-  Widget _commissionInfoRow(String label, String value) {
+  Widget _infoRow(IconData icon, String label, String value) {
     return Row(
       children: [
+        Icon(icon, size: 15, color: AppTheme.textSecondary),
+        const SizedBox(width: 8),
         Text(
           label,
           style: const TextStyle(
             fontSize: 12,
             color: AppTheme.textSecondary,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const Spacer(),
@@ -465,4 +697,20 @@ class _EarningsScreenState extends State<EarningsScreen> {
       ],
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+class _StatItem {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  const _StatItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 }
