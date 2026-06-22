@@ -127,6 +127,10 @@ const Map<String, String> stringsHi = {
   'confirmPickup': 'पुष्टि करें और ग्राहक को भेजें',
   'waitingCustomer': 'ग्राहक की पुष्टि की प्रतीक्षा...',
   'kg': 'kg',
+  'weighingMachinePhoto': 'वजन मशीन की फोटो',
+  'takeWeighingPhoto': 'वजन मशीन की फोटो लें (रीडिंग के साथ)',
+  'photoRequiredError': 'जारी रखने के लिए कृपया वजन मशीन की फोटो अपलोड करें',
+  'weighingPhotoSubmitting': 'वजन मशीन की फोटो अपलोड हो रही है...',
 
   // Orders
   'myOrders': 'मेरे ऑर्डर',

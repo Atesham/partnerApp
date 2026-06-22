@@ -139,15 +139,32 @@ class OrderProvider extends ChangeNotifier {
   Future<bool> submitFinalPricing(
     String orderId,
     List<ScrapItem> items,
-    double totalPayout,
-  ) async {
+    double totalPayout, {
+    String? weighingPhotoUrl,
+  }) async {
     try {
-      await _db.collection('orders').doc(orderId).update({
+      final Map<String, dynamic> updateData = {
         'scrapItems': items.map((e) => e.toJson()).toList(),
         'finalPayout': totalPayout,
-        'status': OrderStatus.pickupStarted.name,
-        'pricingSubmittedAt': FieldValue.serverTimestamp(),
-      });
+        'status': OrderStatus.completed.name,
+        'customerConfirmed': true,
+        'completedAt': FieldValue.serverTimestamp(),
+      };
+      if (weighingPhotoUrl != null) {
+        updateData['weighingPhotoUrl'] = weighingPhotoUrl;
+      }
+      await _db.collection('orders').doc(orderId).update(updateData);
+
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        // Restore partner availability
+        await _db.collection('partners').doc(uid).update({
+          'isAvailable': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        await LocationTrackingService.instance.markOrderCompleted();
+      }
+
       return true;
     } catch (e) {
       _error = e.toString();
@@ -192,7 +209,11 @@ class EarningsProvider extends ChangeNotifier {
   int _weekOrders = 0;
   int _monthOrders = 0;
   double _walletBalance = 0;
+  double _commissionDueBalance = 0;
+  DateTime? _commissionDueAt;
+  bool _commissionBlocked = false;
   bool _isLoading = false;
+  StreamSubscription<DocumentSnapshot>? _partnerWalletSub;
 
   double get todayEarnings => _todayEarnings;
   double get weekEarnings => _weekEarnings;
@@ -201,14 +222,45 @@ class EarningsProvider extends ChangeNotifier {
   int get weekOrders => _weekOrders;
   int get monthOrders => _monthOrders;
   double get walletBalance => _walletBalance;
+  double get commissionDueBalance => _commissionDueBalance;
+  DateTime? get commissionDueAt => _commissionDueAt;
+  bool get commissionBlocked => _commissionBlocked;
+  bool get hasCommissionDue => _commissionDueBalance > 0.01;
+  bool get shouldBlockForCommission =>
+      _commissionBlocked ||
+      _commissionDueBalance >= 500 ||
+      (hasCommissionDue &&
+          _commissionDueAt != null &&
+          DateTime.now().isAfter(_commissionDueAt!));
   bool get isLoading => _isLoading;
+
+  void listenToWallet() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    _partnerWalletSub?.cancel();
+    _partnerWalletSub =
+        _db.collection('partners').doc(uid).snapshots().listen((doc) {
+      final data = doc.data();
+      if (data == null) return;
+      _walletBalance = (data['walletBalance'] ?? 0.0).toDouble();
+      _commissionDueBalance =
+          (data['commissionDueBalance'] ?? 0.0).toDouble();
+      _commissionDueAt =
+          (data['commissionDueAt'] as Timestamp?)?.toDate();
+      _commissionBlocked = data['commissionBlocked'] ?? false;
+      notifyListeners();
+    });
+  }
 
   Future<void> loadEarnings() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    _isLoading = true;
-    notifyListeners();
+    Future.microtask(() {
+      _isLoading = true;
+      notifyListeners();
+    });
 
     try {
       final now = DateTime.now();
@@ -255,6 +307,12 @@ class EarningsProvider extends ChangeNotifier {
       if (partnerDoc.exists) {
         _walletBalance =
             (partnerDoc.data()?['walletBalance'] ?? 0.0).toDouble();
+        _commissionDueBalance =
+            (partnerDoc.data()?['commissionDueBalance'] ?? 0.0).toDouble();
+        _commissionDueAt =
+            (partnerDoc.data()?['commissionDueAt'] as Timestamp?)?.toDate();
+        _commissionBlocked =
+            partnerDoc.data()?['commissionBlocked'] ?? false;
       }
     } catch (_) {}
 
@@ -263,6 +321,8 @@ class EarningsProvider extends ChangeNotifier {
   }
 
   void reset() {
+    _partnerWalletSub?.cancel();
+    _partnerWalletSub = null;
     _todayEarnings = 0;
     _weekEarnings = 0;
     _monthEarnings = 0;
@@ -270,6 +330,22 @@ class EarningsProvider extends ChangeNotifier {
     _weekOrders = 0;
     _monthOrders = 0;
     _walletBalance = 0;
+    _commissionDueBalance = 0;
+    _commissionDueAt = null;
+    _commissionBlocked = false;
     notifyListeners();
+  }
+
+  Future<void> recordCommissionPaymentOpened() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || _commissionDueBalance <= 0) return;
+
+    final partnerRef = _db.collection('partners').doc(uid);
+    await partnerRef.collection('commission_payment_attempts').add({
+      'amount': _commissionDueBalance,
+      'status': 'initiated',
+      'upiId': 'scrapwell@upi',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
   }
 }

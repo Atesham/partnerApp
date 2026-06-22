@@ -7,12 +7,40 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:124131366432:android:4cad1ad67d798e6c954e45",
+        "android_client_info": {
+          "package_name": "com.example.kabadi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBoR09zrnAksJOv_LrQ7hcEwH5R3xCJEM0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:124131366432:android:17db81b99cd52643954e45",
         "android_client_info": {
           "package_name": "com.scrapwell.partner"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "124131366432-lhkqk97o9dn1vsqkshkpnhi4vpr8cpn0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.scrapwell.partner",
+            "certificate_hash": "6aa183fa327f87224ba91e2c32f6603ab4e2f6c6"
+          }
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBoR09zrnAksJOv_LrQ7hcEwH5R3xCJEM0"

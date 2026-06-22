@@ -29,6 +29,7 @@ class PartnerProvider extends ChangeNotifier {
   bool get isApproved => _partner.isApproved;
   bool get hasProfile => _partner.uid.isNotEmpty;
   bool get locationAllowed => _locationAllowed;
+  bool get isCommissionBlocked => _partner.shouldBlockForCommission;
 
   final _db = FirebaseFirestore.instance;
 
@@ -72,8 +73,8 @@ class PartnerProvider extends ChangeNotifier {
         final prefs = await SharedPreferences.getInstance();
         _locationAllowed = prefs.getBool('location_allowed') ?? true;
         
-        // Enforce offline if location permission toggled off
-        if (!_locationAllowed && _isOnline) {
+        // Enforce offline if location permission or commission status blocks orders.
+        if ((!_locationAllowed || _partner.shouldBlockForCommission) && _isOnline) {
           await toggleOnline(false);
         } else if (_isOnline) {
           LocationTrackingService.instance.startTracking();
@@ -94,6 +95,13 @@ class PartnerProvider extends ChangeNotifier {
     // Prevent online if location access is overridden off
     if (online && !_locationAllowed) {
       _error = 'Location access is disabled in Privacy Settings.';
+      notifyListeners();
+      return;
+    }
+
+    if (online && _partner.shouldBlockForCommission) {
+      _error =
+          'Commission payment is due. Pay Scrapwell commission to receive more orders.';
       notifyListeners();
       return;
     }
@@ -204,6 +212,10 @@ class PartnerProvider extends ChangeNotifier {
         'currentLat': partner.shopLat,
         'currentLng': partner.shopLng,
         'isOnline': false,
+        'isAvailable': false,
+        'commissionDueBalance': 0.0,
+        'commissionTotalBilled': 0.0,
+        'commissionBlocked': false,
         'scrapCategories': partner.scrapCategories,
         'profilePhotoUrl': partner.profilePhotoUrl,
         'shopPhotoUrl': partner.shopPhotoUrl,

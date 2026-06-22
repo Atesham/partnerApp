@@ -130,6 +130,10 @@ const Map<String, String> stringsEn = {
   'confirmPickup': 'Confirm & Send to Customer',
   'waitingCustomer': 'Waiting for customer confirmation...',
   'kg': 'kg',
+  'weighingMachinePhoto': 'Weighing Machine Photo',
+  'takeWeighingPhoto': 'Click photo of weighing machine (with reading)',
+  'photoRequiredError': 'Please upload a photo of the weighing machine to continue',
+  'weighingPhotoSubmitting': 'Uploading weighing machine photo...',
 
   // Orders
   'myOrders': 'My Orders',

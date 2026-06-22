@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/order_model.dart';
 import '../../../core/providers/order_provider.dart';
 import '../../../core/widgets/shared_widgets.dart';
+import '../../../core/services/supabase_storage_service.dart';
+import '../../../core/l10n/app_localizations.dart';
 
 class WeighingScreen extends StatefulWidget {
   final OrderModel order;
@@ -33,7 +36,8 @@ class _WeighingScreenState extends State<WeighingScreen> {
   final _orders = OrderProvider();
   late List<_WeighingEntry> _entries;
   bool _isSubmitting = false;
-  bool _waitingConfirmation = false;
+  XFile? _weighingPhoto;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -51,10 +55,38 @@ class _WeighingScreenState extends State<WeighingScreen> {
     super.dispose();
   }
 
+  Future<void> _takePhoto() async {
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 70,
+      );
+      if (photo != null) {
+        setState(() {
+          _weighingPhoto = photo;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
+  }
+
   double get _totalPayout => _entries.fold(0, (sum, e) => sum + e.total);
 
   Future<void> _submit() async {
+    if (_weighingPhoto == null) {
+      AppTheme.showSnack(context, context.t('photoRequiredError'), isError: true);
+      return;
+    }
+
     setState(() => _isSubmitting = true);
+
+    String? photoUrl;
+    try {
+      photoUrl = await SupabaseStorageService.uploadImage(_weighingPhoto!);
+    } catch (e) {
+      debugPrint('Supabase upload failed: $e');
+    }
 
     final items = widget.order.scrapItems.asMap().entries.map((entry) {
       final e = _entries[entry.key];
@@ -66,33 +98,23 @@ class _WeighingScreenState extends State<WeighingScreen> {
 
     final ok = await _orders.submitFinalPricing(
       widget.order.orderId, items, _totalPayout,
+      weighingPhotoUrl: photoUrl,
     );
 
     if (!mounted) return;
-    setState(() { _isSubmitting = false; _waitingConfirmation = ok; });
+    setState(() { _isSubmitting = false; });
 
     if (ok) {
-      _listenForConfirmation();
+      final updated = (OrderProvider().completedOrders.where((o) => o.orderId == widget.order.orderId).firstOrNull) ?? widget.order;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _FinalConfirmationScreen(order: updated, payout: _totalPayout),
+        ),
+      );
     } else {
       AppTheme.showSnack(context, 'Failed to submit pricing. Try again.', isError: true);
     }
-  }
-
-  void _listenForConfirmation() {
-    // Listen for customer confirmation in real-time
-    OrderProvider().addListener(() {
-      final updated = OrderProvider().activeOrders
-          .where((o) => o.orderId == widget.order.orderId)
-          .firstOrNull;
-      if (updated != null && updated.customerConfirmed && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => _FinalConfirmationScreen(order: updated, payout: _totalPayout),
-          ),
-        );
-      }
-    });
   }
 
   void _updateEntry(int i, {double? weight, double? rate}) {
@@ -114,9 +136,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _waitingConfirmation
-          ? _buildWaiting()
-          : Column(
+      body: Column(
               children: [
                 Expanded(
                   child: SingleChildScrollView(
@@ -189,6 +209,8 @@ class _WeighingScreenState extends State<WeighingScreen> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: 20),
+                        _buildPhotoSection(),
                         const SizedBox(height: 20),
                       ],
                     ),
@@ -267,31 +289,124 @@ class _WeighingScreenState extends State<WeighingScreen> {
     );
   }
 
-  Widget _buildWaiting() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 64, height: 64,
-              child: CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 4),
-            ),
-            const SizedBox(height: 24),
-            const Text('Waiting for Customer', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-            const SizedBox(height: 8),
-            const Text('The customer is reviewing the final pricing. Please wait for confirmation.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: AppTheme.textSecondary, height: 1.6)),
-            const SizedBox(height: 32),
-            Text('Total: ₹${_totalPayout.toStringAsFixed(0)}',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primary)),
-          ],
+  Widget _buildPhotoSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppTheme.subtleShadow,
+        border: Border.all(
+          color: _weighingPhoto == null ? AppTheme.border : AppTheme.primary.withOpacity(0.3),
+          width: 1.5,
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.camera_alt_rounded,
+                color: _weighingPhoto == null ? AppTheme.textSecondary : AppTheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                context.t('weighingMachinePhoto'),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              if (_weighingPhoto != null)
+                const Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 20),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            context.t('takeWeighingPhoto'),
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: _takePhoto,
+            child: Container(
+              width: double.infinity,
+              height: 160,
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.border, style: BorderStyle.solid, width: 1.5),
+              ),
+              child: _weighingPhoto == null
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_a_photo_rounded, size: 40, color: AppTheme.textHint),
+                        const SizedBox(height: 8),
+                        Text(
+                          context.t('tapToSelect'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textHint,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    )
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: FutureBuilder<Uint8List>(
+                              future: _weighingPhoto!.readAsBytes(),
+                              builder: (context, snapshot) {
+                                if (snapshot.hasData) {
+                                  return Image.memory(snapshot.data!, fit: BoxFit.cover);
+                                }
+                                return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+                              },
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.cached_rounded, color: Colors.white, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    context.t('retry'),
+                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
+
 }
 
 // ── Final Confirmation Screen ─────────────────────────────────────────────

@@ -78,6 +78,12 @@ class PartnerModel {
   final double maxDistanceKm;
   final int maxScheduledSlots;
   final List<ReservedSlot> reservedSlots;
+  final double commissionDueBalance;
+  final double commissionTotalBilled;
+  final DateTime? commissionCycleStartedAt;
+  final DateTime? commissionDueAt;
+  final DateTime? commissionLastPaymentAt;
+  final bool commissionBlocked;
 
   const PartnerModel({
     required this.uid,
@@ -125,6 +131,12 @@ class PartnerModel {
     this.maxDistanceKm = 15.0,
     this.maxScheduledSlots = 10,
     this.reservedSlots = const [],
+    this.commissionDueBalance = 0.0,
+    this.commissionTotalBilled = 0.0,
+    this.commissionCycleStartedAt,
+    this.commissionDueAt,
+    this.commissionLastPaymentAt,
+    this.commissionBlocked = false,
   });
 
   factory PartnerModel.empty() => PartnerModel(
@@ -144,6 +156,9 @@ class PartnerModel {
         maxDistanceKm: 15.0,
         maxScheduledSlots: 10,
         reservedSlots: const [],
+        commissionDueBalance: 0.0,
+        commissionTotalBilled: 0.0,
+        commissionBlocked: false,
       );
 
   factory PartnerModel.fromJson(Map<String, dynamic> json) {
@@ -203,6 +218,16 @@ class PartnerModel {
       reservedSlots: (json['reservedSlots'] as List<dynamic>? ?? [])
           .map((e) => ReservedSlot.fromJson(e as Map<String, dynamic>))
           .toList(),
+      commissionDueBalance:
+          (json['commissionDueBalance'] ?? 0.0).toDouble(),
+      commissionTotalBilled:
+          (json['commissionTotalBilled'] ?? 0.0).toDouble(),
+      commissionCycleStartedAt:
+          (json['commissionCycleStartedAt'] as Timestamp?)?.toDate(),
+      commissionDueAt: (json['commissionDueAt'] as Timestamp?)?.toDate(),
+      commissionLastPaymentAt:
+          (json['commissionLastPaymentAt'] as Timestamp?)?.toDate(),
+      commissionBlocked: json['commissionBlocked'] ?? false,
     );
   }
 
@@ -258,6 +283,17 @@ class PartnerModel {
       'deleted': deleted,
       'maxScheduledSlots': maxScheduledSlots,
       'reservedSlots': reservedSlots.map((e) => e.toJson()).toList(),
+      'commissionDueBalance': commissionDueBalance,
+      'commissionTotalBilled': commissionTotalBilled,
+      'commissionCycleStartedAt': commissionCycleStartedAt != null
+          ? Timestamp.fromDate(commissionCycleStartedAt!)
+          : null,
+      'commissionDueAt':
+          commissionDueAt != null ? Timestamp.fromDate(commissionDueAt!) : null,
+      'commissionLastPaymentAt': commissionLastPaymentAt != null
+          ? Timestamp.fromDate(commissionLastPaymentAt!)
+          : null,
+      'commissionBlocked': commissionBlocked,
     };
   }
 
@@ -307,6 +343,12 @@ class PartnerModel {
     double? maxDistanceKm,
     int? maxScheduledSlots,
     List<ReservedSlot>? reservedSlots,
+    double? commissionDueBalance,
+    double? commissionTotalBilled,
+    DateTime? commissionCycleStartedAt,
+    DateTime? commissionDueAt,
+    DateTime? commissionLastPaymentAt,
+    bool? commissionBlocked,
   }) {
     return PartnerModel(
       uid: uid ?? this.uid,
@@ -354,6 +396,16 @@ class PartnerModel {
       maxDistanceKm: maxDistanceKm ?? this.maxDistanceKm,
       maxScheduledSlots: maxScheduledSlots ?? this.maxScheduledSlots,
       reservedSlots: reservedSlots ?? this.reservedSlots,
+      commissionDueBalance:
+          commissionDueBalance ?? this.commissionDueBalance,
+      commissionTotalBilled:
+          commissionTotalBilled ?? this.commissionTotalBilled,
+      commissionCycleStartedAt:
+          commissionCycleStartedAt ?? this.commissionCycleStartedAt,
+      commissionDueAt: commissionDueAt ?? this.commissionDueAt,
+      commissionLastPaymentAt:
+          commissionLastPaymentAt ?? this.commissionLastPaymentAt,
+      commissionBlocked: commissionBlocked ?? this.commissionBlocked,
     );
   }
 
@@ -364,6 +416,14 @@ class PartnerModel {
 
   bool get isApproved => status == PartnerStatus.approved;
   bool get isPending => status == PartnerStatus.pending;
+  bool get hasCommissionDue => commissionDueBalance > 0.01;
+  bool get isCommissionOverLimit => commissionDueBalance >= 500;
+  bool get isCommissionOverdue =>
+      hasCommissionDue &&
+      commissionDueAt != null &&
+      DateTime.now().isAfter(commissionDueAt!);
+  bool get shouldBlockForCommission =>
+      commissionBlocked || isCommissionOverLimit || isCommissionOverdue;
   String get displayName => fullName.isNotEmpty ? fullName : 'Partner';
   String get initials {
     final parts = fullName.trim().split(' ');

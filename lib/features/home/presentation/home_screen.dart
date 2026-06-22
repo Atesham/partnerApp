@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/l10n/app_localizations.dart';
 import '../../../core/providers/partner_provider.dart';
@@ -11,7 +11,7 @@ import '../../../core/widgets/shared_widgets.dart';
 import 'widgets/online_toggle_card.dart';
 import 'widgets/lead_feed_card.dart';
 import 'lead_popup.dart';
-import '../../../core/utils/location_utils.dart';
+
 import '../../orders/presentation/order_tracking_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -21,7 +21,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // ✅ FIX: Use the singleton directly — same instance everywhere
   final _partner = PartnerProvider();
   final _orders = OrderProvider();
   final _earnings = EarningsProvider();
@@ -33,38 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLeadsLoading = true;
   final Set<String> _declinedOrderIds = {};
 
-  double get _partnerLat => _partner.partner.currentLat != 0.0
-      ? _partner.partner.currentLat
-      : _partner.partner.shopLat;
-
-  double get _partnerLng => _partner.partner.currentLng != 0.0
-      ? _partner.partner.currentLng
-      : _partner.partner.shopLng;
-
-  double get _scanLat {
-    final activeOrder = _orders.currentOrder;
-    if (activeOrder != null && activeOrder.isActive) {
-      return activeOrder.customerLat;
-    }
-    return _partnerLat;
-  }
-
-  double get _scanLng {
-    final activeOrder = _orders.currentOrder;
-    if (activeOrder != null && activeOrder.isActive) {
-      return activeOrder.customerLng;
-    }
-    return _partnerLng;
-  }
-
-  double get _scanRadius {
-    final activeOrder = _orders.currentOrder;
-    if (activeOrder != null && activeOrder.isActive) {
-      return 5.0; // Batching range: within 5 km of the active order customer destination
-    }
-    return _partner.partner.maxDistanceKm;
-  }
-
   @override
   void initState() {
     super.initState();
@@ -72,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _partner.listenToPartner();
     _orders.listenToOrders(); // Listen to active and reserved/scheduled orders
     _earnings.loadEarnings();
+    _earnings.listenToWallet();
     _partner.addListener(_handlePartnerChange);
     _listenToLeads();
 
@@ -117,50 +85,57 @@ class _HomeScreenState extends State<HomeScreen> {
     // The partner's current location and maxDistanceKm are read from the partner model.
     _leadsSub = LeadService.instance
         .instantPickupStream(_partner.partner)
-        .listen((orders) {
-      if (!mounted) return;
+        .listen(
+          (orders) {
+            if (!mounted) return;
 
-      // Filter out declined/ignored orders
-      final visibleOrders = orders.where((o) => !_declinedOrderIds.contains(o.orderId)).toList();
+            // Filter out declined/ignored orders
+            final visibleOrders =
+                orders
+                    .where((o) => !_declinedOrderIds.contains(o.orderId))
+                    .toList();
 
-      setState(() {
-        _nearbyOrders = visibleOrders;
-        _isLeadsLoading = false;
-      });
+            setState(() {
+              _nearbyOrders = visibleOrders;
+              _isLeadsLoading = false;
+            });
 
-      // If popup is shown but the order was taken (no longer in stream), auto-close
-      if (_leadPopupShown && _incomingOrder != null) {
-        final stillAvailable =
-            visibleOrders.any((o) => o.orderId == _incomingOrder!.orderId);
-        if (!stillAvailable) {
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
-          }
-          setState(() {
-            _incomingOrder = null;
-            _leadPopupShown = false;
-          });
-          return;
-        }
-      }
+            // If popup is shown but the order was taken (no longer in stream), auto-close
+            if (_leadPopupShown && _incomingOrder != null) {
+              final stillAvailable = visibleOrders.any(
+                (o) => o.orderId == _incomingOrder!.orderId,
+              );
+              if (!stillAvailable) {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+                setState(() {
+                  _incomingOrder = null;
+                  _leadPopupShown = false;
+                });
+                return;
+              }
+            }
 
-      if (visibleOrders.isEmpty || _leadPopupShown) return;
+            if (visibleOrders.isEmpty || _leadPopupShown) return;
 
-      // Show the nearest unviewed order as a popup
-      final order = visibleOrders.first;
-      if (_incomingOrder?.orderId == order.orderId) return;
-      setState(() {
-        _incomingOrder = order;
-        _leadPopupShown = true;
-      });
-      _showLeadPopup(order);
-    }, onError: (err) {
-      if (mounted) {
-        setState(() {
-          _isLeadsLoading = false;
-        });
-      }
-    });
+            // Show the nearest unviewed order as a popup
+            final order = visibleOrders.first;
+            if (_incomingOrder?.orderId == order.orderId) return;
+            setState(() {
+              _incomingOrder = order;
+              _leadPopupShown = true;
+            });
+            _showLeadPopup(order);
+          },
+          onError: (err) {
+            if (mounted) {
+              setState(() {
+                _isLeadsLoading = false;
+              });
+            }
+          },
+        );
   }
 
   void _showLeadPopup(OrderModel order) {
@@ -196,6 +171,31 @@ class _HomeScreenState extends State<HomeScreen> {
     if (h < 12) return context.t('greetingMorning');
     if (h < 17) return context.t('greetingAfternoon');
     return context.t('greetingEvening');
+  }
+
+  Future<void> _payCommission() async {
+    final amount = _earnings.commissionDueBalance;
+    if (amount <= 0) return;
+    await _earnings.recordCommissionPaymentOpened();
+    final uri = Uri(
+      scheme: 'upi',
+      host: 'pay',
+      queryParameters: {
+        'pa': 'scrapwell@upi',
+        'pn': 'Scrapwell',
+        'am': amount.toStringAsFixed(2),
+        'cu': 'INR',
+        'tn': 'Scrapwell partner commission',
+      },
+    );
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      AppTheme.showSnack(
+        context,
+        'No UPI app found. Pay to scrapwell@upi and contact support.',
+        isError: true,
+      );
+    }
   }
 
   @override
@@ -318,6 +318,8 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           const SizedBox(height: 4),
 
+          if (_earnings.hasCommissionDue) _buildCommissionDueCard(),
+
           if (!_partner.locationAllowed)
             Container(
               margin: const EdgeInsets.only(bottom: 12),
@@ -361,6 +363,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   Localizations.localeOf(context).languageCode == 'hi'
                       ? 'स्थान पहुंच बंद है। इसे गोपनीयता केंद्र में चालू करें।'
                       : 'Location access is disabled. Enable it in Privacy & Data to go online.',
+                  isError: true,
+                );
+                return;
+              }
+              if (v && _partner.isCommissionBlocked) {
+                AppTheme.showSnack(
+                  context,
+                  'Pay pending Scrapwell commission to receive more orders.',
                   isError: true,
                 );
                 return;
@@ -485,6 +495,83 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildCommissionDueCard() {
+    final dueAt = _earnings.commissionDueAt;
+    final dueText = dueAt == null
+        ? 'Due every Tuesday'
+        : 'Due by ${dueAt.day}/${dueAt.month}/${dueAt.year}';
+    final blocked = _partner.isCommissionBlocked ||
+        _earnings.shouldBlockForCommission;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: blocked ? const Color(0xFFFEF2F2) : const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: blocked
+              ? AppTheme.error.withOpacity(0.35)
+              : AppTheme.warning.withOpacity(0.35),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            blocked
+                ? Icons.lock_clock_rounded
+                : Icons.account_balance_wallet_rounded,
+            color: blocked ? AppTheme.error : AppTheme.warning,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  blocked ? 'Commission payment required' : 'Commission due',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: blocked ? AppTheme.error : AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Pay Rs ${_earnings.commissionDueBalance.toStringAsFixed(0)} to Scrapwell. $dueText.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton(
+            onPressed: _payCommission,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Pay',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _statCard(String value, String label, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -555,7 +642,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryLight,
                   borderRadius: BorderRadius.circular(12),
@@ -588,11 +678,12 @@ class _HomeScreenState extends State<HomeScreen> {
               max: 30.0,
               divisions: 5,
               label: '${currentRadius.toStringAsFixed(0)} km',
-              onChanged: isOnline
-                  ? (value) async {
-                      await _partner.updateSearchRadius(value);
-                    }
-                  : null,
+              onChanged:
+                  isOnline
+                      ? (value) async {
+                        await _partner.updateSearchRadius(value);
+                      }
+                      : null,
             ),
           ),
           Padding(
@@ -600,18 +691,22 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('5 km',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isOnline ? AppTheme.textSecondary : AppTheme.border,
-                      fontWeight: FontWeight.w600,
-                    )),
-                Text('30 km',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isOnline ? AppTheme.textSecondary : AppTheme.border,
-                      fontWeight: FontWeight.w600,
-                    )),
+                Text(
+                  '5 km',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isOnline ? AppTheme.textSecondary : AppTheme.border,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  '30 km',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isOnline ? AppTheme.textSecondary : AppTheme.border,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -621,32 +716,87 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildLeadFeed(BuildContext context) {
+    if (_partner.isCommissionBlocked || _earnings.shouldBlockForCommission) {
+      return _buildCommissionBlockedState();
+    }
     if (!_partner.isOnline) return _buildOfflineEmptyState();
 
     if (_isLeadsLoading) {
-      return const Column(
-        children: [SkeletonLeadCard(), SkeletonLeadCard()],
-      );
+      return const Column(children: [SkeletonLeadCard(), SkeletonLeadCard()]);
     }
 
     if (_nearbyOrders.isEmpty) return _buildEmptyLeadState();
 
     return Column(
-      children: _nearbyOrders
-          .map(
-            (order) => LeadFeedCard(
-              order: order,
-              partner: _partner.partner,
-              onAccept: () => _showLeadPopup(order),
-              onIgnore: () {
-                setState(() {
-                  _declinedOrderIds.add(order.orderId);
-                  _nearbyOrders.removeWhere((o) => o.orderId == order.orderId);
-                });
-              },
+      children:
+          _nearbyOrders
+              .map(
+                (order) => LeadFeedCard(
+                  order: order,
+                  partner: _partner.partner,
+                  onAccept: () => _showLeadPopup(order),
+                  onIgnore: () {
+                    setState(() {
+                      _declinedOrderIds.add(order.orderId);
+                      _nearbyOrders.removeWhere(
+                        (o) => o.orderId == order.orderId,
+                      );
+                    });
+                  },
+                ),
+              )
+              .toList(),
+    );
+  }
+
+  Widget _buildCommissionBlockedState() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppTheme.subtleShadow,
+        border: Border.all(color: AppTheme.error.withOpacity(0.18)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.payments_rounded, size: 42, color: AppTheme.error),
+          const SizedBox(height: 12),
+          const Text(
+            'Orders are paused',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
             ),
-          )
-          .toList(),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Clear pending commission of Rs ${_earnings.commissionDueBalance.toStringAsFixed(0)} to receive further orders.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 14),
+          ElevatedButton(
+            onPressed: _payCommission,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Pay Commission'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -758,7 +908,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 const PulsingDot(color: AppTheme.primary, size: 7),
                 const SizedBox(width: 8),
                 Text(
-                  context.t('scanningRadiusDynamic').replaceAll(
+                  context
+                      .t('scanningRadiusDynamic')
+                      .replaceAll(
                         '{radius}',
                         _partner.partner.maxDistanceKm.toStringAsFixed(0),
                       ),
@@ -805,7 +957,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 12),
         Column(
-          children: reserved.map((order) => _buildReservedCard(context, order)).toList(),
+          children:
+              reserved
+                  .map((order) => _buildReservedCard(context, order))
+                  .toList(),
         ),
       ],
     );
@@ -831,19 +986,29 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
-                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFDBA74).withOpacity(0.5)),
+                  border: Border.all(
+                    color: const Color(0xFFFDBA74).withOpacity(0.5),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.bookmark_added_rounded, size: 12, color: Color(0xFFEA580C)),
+                    const Icon(
+                      Icons.bookmark_added_rounded,
+                      size: 12,
+                      color: Color(0xFFEA580C),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       context.t('bookedAndPending'),
@@ -876,11 +1041,17 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFFFEF2F2),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFCA5A5).withOpacity(0.5)),
+                border: Border.all(
+                  color: const Color(0xFFFCA5A5).withOpacity(0.5),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.offline_bolt_rounded, size: 16, color: AppTheme.error),
+                  const Icon(
+                    Icons.offline_bolt_rounded,
+                    size: 16,
+                    color: AppTheme.error,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -902,7 +1073,11 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.location_on_rounded, size: 16, color: AppTheme.error),
+              const Icon(
+                Icons.location_on_rounded,
+                size: 16,
+                color: AppTheme.error,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -921,7 +1096,11 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.schedule_rounded, size: 16, color: AppTheme.textSecondary),
+              const Icon(
+                Icons.schedule_rounded,
+                size: 16,
+                color: AppTheme.textSecondary,
+              ),
               const SizedBox(width: 8),
               Text(
                 order.pickupSlot,
@@ -943,12 +1122,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.error,
                       side: const BorderSide(color: AppTheme.error, width: 1.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       minimumSize: const Size(0, 44),
                     ),
                     child: Text(
-                      Localizations.localeOf(context).languageCode == 'hi' ? 'रद्द करें' : 'Cancel',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                      Localizations.localeOf(context).languageCode == 'hi'
+                          ? 'रद्द करें'
+                          : 'Cancel',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ),
@@ -961,15 +1147,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     showDialog(
                       context: context,
                       barrierDismissible: false,
-                      builder: (_) => const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+                      builder:
+                          (_) => const Center(
+                            child: CircularProgressIndicator(
+                              color: AppTheme.primary,
+                            ),
+                          ),
                     );
-                    final ok = await _orders.updateOrderStatus(order.orderId, OrderStatus.partnerAssigned);
+                    final ok = await _orders.updateOrderStatus(
+                      order.orderId,
+                      OrderStatus.partnerAssigned,
+                    );
                     if (mounted) Navigator.pop(context); // close loader
                     if (ok && mounted) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => OrderTrackingScreen(orderId: order.orderId),
+                          builder:
+                              (_) =>
+                                  OrderTrackingScreen(orderId: order.orderId),
                         ),
                       );
                     }
@@ -977,13 +1173,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     minimumSize: const Size(0, 44),
                     elevation: 0,
                   ),
                   child: Text(
-                    Localizations.localeOf(context).languageCode == 'hi' ? 'यात्रा शुरू करें' : 'Start Trip Now',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                    Localizations.localeOf(context).languageCode == 'hi'
+                        ? 'यात्रा शुरू करें'
+                        : 'Start Trip Now',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
@@ -1001,7 +1204,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.lock_rounded, size: 14, color: AppTheme.textSecondary),
+                  const Icon(
+                    Icons.lock_rounded,
+                    size: 14,
+                    color: AppTheme.textSecondary,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -1027,21 +1234,30 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: Text(
             context.t('cancelReservation'),
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
           ),
           content: Text(
             context.t('cancelReservationConfirm'),
-            style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary, height: 1.4),
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppTheme.textSecondary,
+              height: 1.4,
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(
                 context.t('goBack'),
-                style: const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             ElevatedButton(
@@ -1050,10 +1266,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 showDialog(
                   context: context,
                   barrierDismissible: false,
-                  builder: (_) => const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+                  builder:
+                      (_) => const Center(
+                        child: CircularProgressIndicator(
+                          color: AppTheme.primary,
+                        ),
+                      ),
                 );
                 try {
-                  final ok = await LeadService.instance.cancelReservedOrder(order);
+                  final ok = await LeadService.instance.cancelReservedOrder(
+                    order,
+                  );
                   if (mounted) Navigator.pop(context); // Close loading
                   if (ok && mounted) {
                     AppTheme.showSnack(
@@ -1077,11 +1300,15 @@ class _HomeScreenState extends State<HomeScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.error,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 elevation: 0,
               ),
               child: Text(
-                Localizations.localeOf(context).languageCode == 'hi' ? 'आरक्षण रद्द करें' : 'Cancel Reservation',
+                Localizations.localeOf(context).languageCode == 'hi'
+                    ? 'आरक्षण रद्द करें'
+                    : 'Cancel Reservation',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),

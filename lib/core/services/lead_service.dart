@@ -34,6 +34,7 @@ class LeadService {
   Stream<List<OrderModel>> instantPickupStream(PartnerModel partner) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const Stream.empty();
+    if (partner.shouldBlockForCommission) return Stream.value(const []);
 
     final partnerLat = partner.currentLat != 0.0 ? partner.currentLat : partner.shopLat;
     final partnerLng = partner.currentLng != 0.0 ? partner.currentLng : partner.shopLng;
@@ -99,6 +100,7 @@ class LeadService {
   Future<bool> acceptOrder(OrderModel order, PartnerModel partner) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return false;
+    if (partner.shouldBlockForCommission) return false;
 
     try {
       bool accepted = false;
@@ -130,6 +132,10 @@ class LeadService {
         if (!partnerSnap.exists) throw Exception('Partner not found');
 
         final partnerData = partnerSnap.data()!;
+        final freshPartner = PartnerModel.fromJson(partnerData);
+        if (freshPartner.shouldBlockForCommission) {
+          throw Exception('Commission payment due');
+        }
         if (partnerData['isAvailable'] != true) {
           throw Exception('Partner not available');
         }
@@ -451,6 +457,7 @@ class LeadService {
   }) {
     if (partner.status != PartnerStatus.approved) return null;
     if (partner.deleted) return null;
+    if (partner.shouldBlockForCommission) return null;
 
     // Use live GPS location if available, else fall back to shop location
     final pLat = partner.currentLat != 0.0 ? partner.currentLat : partner.shopLat;
