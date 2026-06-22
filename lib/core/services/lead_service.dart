@@ -261,6 +261,7 @@ class LeadService {
         final partnerSnap = await tx.get(partnerRef);
         if (!partnerSnap.exists) throw Exception('Partner not found');
         final freshPartner = PartnerModel.fromJson(partnerSnap.data()!);
+        final liveSnap = await tx.get(liveLocRef);
 
         // Re-check eligibility with fresh data
         if (!isWithinWorkingHours(freshPartner, scheduledTime)) {
@@ -302,7 +303,6 @@ class LeadService {
 
         // Update live_locations with assigned order reference (non-blocking
         // for partner availability — scheduled orders don't block instant pickups)
-        final liveSnap = await tx.get(liveLocRef);
         if (liveSnap.exists) {
           tx.set(
             liveLocRef,
@@ -369,8 +369,13 @@ class LeadService {
       }
 
       await _db.runTransaction((tx) async {
-        // Remove from current partner's calendar
         final currentPartnerSnap = await tx.get(currentPartnerRef);
+        DocumentSnapshot<Map<String, dynamic>>? nextSnap;
+        if (nextPartner != null) {
+          nextSnap = await tx.get(_db.collection('partners').doc(nextPartner.uid));
+        }
+
+        // Remove from current partner's calendar
         if (currentPartnerSnap.exists) {
           final currentData =
               PartnerModel.fromJson(currentPartnerSnap.data()!);
@@ -386,8 +391,7 @@ class LeadService {
         if (nextPartner != null) {
           // Reassign to next partner
           final nextRef = _db.collection('partners').doc(nextPartner.uid);
-          final nextSnap = await tx.get(nextRef);
-          if (nextSnap.exists) {
+          if (nextSnap != null && nextSnap.exists) {
             final nextData = PartnerModel.fromJson(nextSnap.data()!);
             final dateStr =
                 '${scheduledTime.year}-${scheduledTime.month.toString().padLeft(2, '0')}-${scheduledTime.day.toString().padLeft(2, '0')}';

@@ -20,7 +20,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _partner = PartnerProvider();
   final _orders = OrderProvider();
   final _earnings = EarningsProvider();
@@ -35,11 +35,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Start listening to the real-time partner document (rating, name, status, earnings, etc.)
     _partner.listenToPartner();
     _orders.listenToOrders(); // Listen to active and reserved/scheduled orders
     _earnings.loadEarnings();
     _earnings.listenToWallet();
+    _partner.refreshLocationAvailability();
     _partner.addListener(_handlePartnerChange);
     _listenToLeads();
 
@@ -50,9 +52,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _partner.removeListener(_handlePartnerChange);
     _leadsSub?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _partner.refreshLocationAvailability();
+    }
   }
 
   void _handlePartnerChange() {
@@ -181,8 +191,8 @@ class _HomeScreenState extends State<HomeScreen> {
       scheme: 'upi',
       host: 'pay',
       queryParameters: {
-        'pa': 'scrapwell@upi',
-        'pn': 'Scrapwell',
+        'pa': _earnings.scrapwellUpiId,
+        'pn': _earnings.scrapwellPayeeName,
         'am': amount.toStringAsFixed(2),
         'cu': 'INR',
         'tn': 'Scrapwell partner commission',
@@ -192,9 +202,20 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       AppTheme.showSnack(
         context,
-        'No UPI app found. Pay to scrapwell@upi and contact support.',
+        'No UPI app found. Pay to ${_earnings.scrapwellUpiId} and contact support.',
         isError: true,
       );
+    }
+  }
+
+  Future<void> _confirmCommissionOnWhatsApp() async {
+    final message = Uri.encodeComponent(
+      'Hello Scrapwell, I have paid my partner commission amount of Rs ${_earnings.commissionDueBalance.toStringAsFixed(0)}. Please verify and clear my due balance.',
+    );
+    final uri = Uri.parse('https://wa.me/918744081962?text=$message');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      AppTheme.showSnack(context, 'Unable to open WhatsApp.', isError: true);
     }
   }
 
@@ -380,6 +401,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
 
           const SizedBox(height: 16),
+          _buildAssignmentRulesCard(),
+
+          const SizedBox(height: 16),
           _buildRadiusSelector(context),
 
           const SizedBox(height: 16),
@@ -551,24 +575,115 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(width: 10),
-          ElevatedButton(
-            onPressed: _payCommission,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          Column(
+            children: [
+              ElevatedButton(
+                onPressed: _payCommission,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Pay',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
               ),
-            ),
-            child: const Text(
-              'Pay',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
+              TextButton(
+                onPressed: _confirmCommissionOnWhatsApp,
+                child: const Text(
+                  'I paid',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAssignmentRulesCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppTheme.subtleShadow,
+        border: Border.all(color: AppTheme.divider.withOpacity(0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'How orders are assigned',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _assignmentRuleRow(
+            Icons.flash_on_rounded,
+            'Instant pickups',
+            'Online + GPS on. Shown by your live location, radius, availability, and scrap category.',
+            AppTheme.primary,
+          ),
+          const SizedBox(height: 10),
+          _assignmentRuleRow(
+            Icons.calendar_month_rounded,
+            'Scheduled pickups',
+            'Can be reserved by working hours and slot availability. GPS online is not required to start a reserved booking.',
+            AppTheme.warning,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _assignmentRuleRow(
+    IconData icon,
+    String title,
+    String body,
+    Color color,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                body,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -794,6 +909,11 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             child: const Text('Pay Commission'),
+          ),
+          TextButton.icon(
+            onPressed: _confirmCommissionOnWhatsApp,
+            icon: const Icon(Icons.chat_rounded, size: 16),
+            label: const Text('I paid, notify Scrapwell'),
           ),
         ],
       ),
@@ -1144,6 +1264,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 flex: canCancel ? 2 : 1,
                 child: ElevatedButton(
                   onPressed: () async {
+                    if (!LeadService.instance.isWithinWorkingHours(
+                      _partner.partner,
+                      DateTime.now(),
+                    )) {
+                      AppTheme.showSnack(
+                        context,
+                        'Scheduled pickups can be started only during your working hours.',
+                        isError: true,
+                      );
+                      return;
+                    }
                     showDialog(
                       context: context,
                       barrierDismissible: false,

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/partner_model.dart';
 import '../services/location_tracking_service.dart';
@@ -48,7 +49,8 @@ class PartnerProvider extends ChangeNotifier {
       }
       // Load saved permission settings
       final prefs = await SharedPreferences.getInstance();
-      _locationAllowed = prefs.getBool('location_allowed') ?? true;
+      final savedAllowed = prefs.getBool('location_allowed') ?? true;
+      _locationAllowed = savedAllowed && await _isGpsReady();
       
       _error = null;
     } catch (e) {
@@ -71,7 +73,8 @@ class PartnerProvider extends ChangeNotifier {
         _isOnline = _partner.isOnline;
         
         final prefs = await SharedPreferences.getInstance();
-        _locationAllowed = prefs.getBool('location_allowed') ?? true;
+        final savedAllowed = prefs.getBool('location_allowed') ?? true;
+        _locationAllowed = savedAllowed && await _isGpsReady();
         
         // Enforce offline if location permission or commission status blocks orders.
         if ((!_locationAllowed || _partner.shouldBlockForCommission) && _isOnline) {
@@ -94,7 +97,11 @@ class PartnerProvider extends ChangeNotifier {
 
     // Prevent online if location access is overridden off
     if (online && !_locationAllowed) {
-      _error = 'Location access is disabled in Privacy Settings.';
+      _locationAllowed = await _isGpsReady();
+    }
+
+    if (online && !_locationAllowed) {
+      _error = 'Turn on GPS and allow location permission to receive instant pickups.';
       notifyListeners();
       return;
     }
@@ -266,6 +273,28 @@ class PartnerProvider extends ChangeNotifier {
       _error = e.toString();
     }
     notifyListeners();
+  }
+
+  Future<void> refreshLocationAvailability() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedAllowed = prefs.getBool('location_allowed') ?? true;
+    _locationAllowed = savedAllowed && await _isGpsReady();
+    if (!_locationAllowed && _isOnline) {
+      await toggleOnline(false);
+    }
+    notifyListeners();
+  }
+
+  Future<bool> _isGpsReady() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return false;
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    return permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse;
   }
 
   // -- Compliance Stack Direct Firestore Mutations --

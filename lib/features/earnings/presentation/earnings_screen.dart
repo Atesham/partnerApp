@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/order_provider.dart';
 import '../../../core/widgets/shared_widgets.dart';
@@ -17,6 +18,43 @@ class _EarningsScreenState extends State<EarningsScreen> {
   void initState() {
     super.initState();
     _earnings.loadEarnings();
+    _earnings.listenToWallet();
+  }
+
+  Future<void> _payCommission() async {
+    final amount = _earnings.commissionDueBalance;
+    if (amount <= 0) return;
+    await _earnings.recordCommissionPaymentOpened();
+    final uri = Uri(
+      scheme: 'upi',
+      host: 'pay',
+      queryParameters: {
+        'pa': _earnings.scrapwellUpiId,
+        'pn': _earnings.scrapwellPayeeName,
+        'am': amount.toStringAsFixed(2),
+        'cu': 'INR',
+        'tn': 'Scrapwell partner commission',
+      },
+    );
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      AppTheme.showSnack(
+        context,
+        'No UPI app found. Pay to ${_earnings.scrapwellUpiId}.',
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> _confirmCommissionOnWhatsApp() async {
+    final message = Uri.encodeComponent(
+      'Hello Scrapwell, I have paid my partner commission amount of Rs ${_earnings.commissionDueBalance.toStringAsFixed(0)}. Please verify and clear my due balance.',
+    );
+    final uri = Uri.parse('https://wa.me/918744081962?text=$message');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      AppTheme.showSnack(context, 'Unable to open WhatsApp.', isError: true);
+    }
   }
 
   @override
@@ -49,6 +87,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
                       const SizedBox(height: 24),
                       // Wallet balance
                       _buildWalletCard(),
+                      const SizedBox(height: 16),
+                      _buildCommissionWalletCard(),
                       const SizedBox(height: 80),
                     ],
                   ),
@@ -271,6 +311,158 @@ class _EarningsScreenState extends State<EarningsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCommissionWalletCard() {
+    final dueAt = _earnings.commissionDueAt;
+    final dueText = dueAt == null
+        ? 'Every Tuesday'
+        : '${dueAt.day}/${dueAt.month}/${dueAt.year}';
+    final blocked = _earnings.shouldBlockForCommission;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppTheme.subtleShadow,
+        border: Border.all(
+          color: blocked
+              ? AppTheme.error.withOpacity(0.2)
+              : AppTheme.warning.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: blocked
+                      ? const Color(0xFFFEF2F2)
+                      : const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  blocked
+                      ? Icons.lock_clock_rounded
+                      : Icons.receipt_long_rounded,
+                  color: blocked ? AppTheme.error : AppTheme.warning,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Scrapwell Commission Wallet',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Rs ${_earnings.commissionDueBalance.toStringAsFixed(0)} due',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: blocked ? AppTheme.error : AppTheme.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _commissionInfoRow('Rate', '2% of completed order bill'),
+          const Divider(height: 18, color: AppTheme.divider),
+          _commissionInfoRow('Pay by', dueText),
+          const Divider(height: 18, color: AppTheme.divider),
+          _commissionInfoRow('UPI ID', _earnings.scrapwellUpiId),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed:
+                  _earnings.commissionDueBalance > 0 ? _payCommission : null,
+              icon: const Icon(Icons.payment_rounded, size: 18),
+              label: const Text('Pay Commission'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                minimumSize: const Size(0, 46),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _confirmCommissionOnWhatsApp,
+              icon: const Icon(Icons.chat_rounded, size: 18),
+              label: const Text('I paid, notify Scrapwell on WhatsApp'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                side: const BorderSide(color: AppTheme.primary),
+                minimumSize: const Size(0, 44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Payment opens in any installed UPI app. Dues are cleared after Scrapwell verifies the transfer.',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppTheme.textSecondary,
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _commissionInfoRow(String label, String value) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppTheme.textSecondary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const Spacer(),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

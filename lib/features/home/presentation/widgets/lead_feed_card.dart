@@ -361,8 +361,8 @@ class _LeadFeedCardState extends State<LeadFeedCard>
               ),
             ),
             const Spacer(),
-            const Text(
-              'First Accept Wins',
+              const Text(
+                'Live GPS + radius',
               style: TextStyle(
                 color: AppTheme.primary,
                 fontSize: 10,
@@ -402,11 +402,9 @@ class _LeadFeedCardState extends State<LeadFeedCard>
               ),
             ),
             const Spacer(),
-            Text(
-              widget.order.pickupSlot.length > 20
-                  ? widget.order.pickupSlot.substring(0, 20)
-                  : widget.order.pickupSlot,
-              style: const TextStyle(
+            const Text(
+              'Working hours checked',
+              style: TextStyle(
                 color: Color(0xFFEA580C),
                 fontSize: 10,
                 fontWeight: FontWeight.w600,

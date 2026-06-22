@@ -142,6 +142,7 @@ exports.notifyPartnersOnNewOrder = onDocumentWritten(
       .collection("partners")
       .where("status", "==", "approved")
       .where("isOnline", "==", true)
+      .where("isAvailable", "==", true)
       .get();
 
     const tokens = [];

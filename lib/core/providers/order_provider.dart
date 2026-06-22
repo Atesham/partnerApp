@@ -212,8 +212,11 @@ class EarningsProvider extends ChangeNotifier {
   double _commissionDueBalance = 0;
   DateTime? _commissionDueAt;
   bool _commissionBlocked = false;
+  String _scrapwellUpiId = 'scrapwell@upi';
+  String _scrapwellPayeeName = 'Scrapwell';
   bool _isLoading = false;
   StreamSubscription<DocumentSnapshot>? _partnerWalletSub;
+  StreamSubscription<DocumentSnapshot>? _paymentConfigSub;
 
   double get todayEarnings => _todayEarnings;
   double get weekEarnings => _weekEarnings;
@@ -225,6 +228,8 @@ class EarningsProvider extends ChangeNotifier {
   double get commissionDueBalance => _commissionDueBalance;
   DateTime? get commissionDueAt => _commissionDueAt;
   bool get commissionBlocked => _commissionBlocked;
+  String get scrapwellUpiId => _scrapwellUpiId;
+  String get scrapwellPayeeName => _scrapwellPayeeName;
   bool get hasCommissionDue => _commissionDueBalance > 0.01;
   bool get shouldBlockForCommission =>
       _commissionBlocked ||
@@ -249,6 +254,17 @@ class EarningsProvider extends ChangeNotifier {
       _commissionDueAt =
           (data['commissionDueAt'] as Timestamp?)?.toDate();
       _commissionBlocked = data['commissionBlocked'] ?? false;
+      notifyListeners();
+    });
+
+    _paymentConfigSub?.cancel();
+    _paymentConfigSub =
+        _db.collection('app_config').doc('payments').snapshots().listen((doc) {
+      final data = doc.data();
+      if (data == null) return;
+      _scrapwellUpiId = (data['scrapwellUpiId'] ?? _scrapwellUpiId).toString();
+      _scrapwellPayeeName =
+          (data['scrapwellPayeeName'] ?? _scrapwellPayeeName).toString();
       notifyListeners();
     });
   }
@@ -323,6 +339,8 @@ class EarningsProvider extends ChangeNotifier {
   void reset() {
     _partnerWalletSub?.cancel();
     _partnerWalletSub = null;
+    _paymentConfigSub?.cancel();
+    _paymentConfigSub = null;
     _todayEarnings = 0;
     _weekEarnings = 0;
     _monthEarnings = 0;
@@ -333,6 +351,8 @@ class EarningsProvider extends ChangeNotifier {
     _commissionDueBalance = 0;
     _commissionDueAt = null;
     _commissionBlocked = false;
+    _scrapwellUpiId = 'scrapwell@upi';
+    _scrapwellPayeeName = 'Scrapwell';
     notifyListeners();
   }
 
@@ -344,7 +364,7 @@ class EarningsProvider extends ChangeNotifier {
     await partnerRef.collection('commission_payment_attempts').add({
       'amount': _commissionDueBalance,
       'status': 'initiated',
-      'upiId': 'scrapwell@upi',
+      'upiId': _scrapwellUpiId,
       'createdAt': FieldValue.serverTimestamp(),
     });
   }

@@ -150,6 +150,10 @@ class NotificationService {
       final currentIds = orders.map((o) => o.orderId).toSet();
       
       if (isFirstRun) {
+        final recentCutoff = DateTime.now().subtract(const Duration(minutes: 5));
+        for (final order in orders.where((o) => o.createdAt.isAfter(recentCutoff))) {
+          _showLocalLeadNotification(order);
+        }
         _knownOrderIds = currentIds;
         isFirstRun = false;
         return;
