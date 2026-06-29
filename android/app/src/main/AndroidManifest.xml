@@ -70,6 +70,11 @@
         <intent>
             <action android:name="android.intent.action.VIEW"/>
         </intent>
+        <!-- For UPI payments -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="upi"/>
+        </intent>
         <!-- For WhatsApp -->
         <package android:name="com.whatsapp"/>
     </queries>

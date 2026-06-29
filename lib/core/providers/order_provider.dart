@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/order_model.dart';
@@ -40,29 +41,31 @@ class OrderProvider extends ChangeNotifier {
     _ordersSub?.cancel();
     _ordersSub = _db
         .collection('orders')
-        .where(Filter.or(
-          Filter('partnerId', isEqualTo: uid),
-          Filter('reservedPartnerId', isEqualTo: uid),
-        ))
+        .where(
+          Filter.or(
+            Filter('partnerId', isEqualTo: uid),
+            Filter('reservedPartnerId', isEqualTo: uid),
+          ),
+        )
         .snapshots()
         .listen((snapshot) {
-      final all = snapshot.docs
-          .map((d) => OrderModel.fromJson(d.data()))
-          .toList();
-      all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          final all =
+              snapshot.docs.map((d) => OrderModel.fromJson(d.data())).toList();
+          all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-      _activeOrders = all.where((o) => o.isActive).toList();
-      _reservedOrders = all.where((o) => o.status == OrderStatus.reserved).toList();
-      _completedOrders =
-          all.where((o) => o.status == OrderStatus.completed).toList();
-      _cancelledOrders =
-          all.where((o) => o.status == OrderStatus.cancelled).toList();
+          _activeOrders = all.where((o) => o.isActive).toList();
+          _reservedOrders =
+              all.where((o) => o.status == OrderStatus.reserved).toList();
+          _completedOrders =
+              all.where((o) => o.status == OrderStatus.completed).toList();
+          _cancelledOrders =
+              all.where((o) => o.status == OrderStatus.cancelled).toList();
 
-      // Current active order (first partner-assigned or higher)
-      _currentOrder = _activeOrders.isNotEmpty ? _activeOrders.first : null;
+          // Current active order (first partner-assigned or higher)
+          _currentOrder = _activeOrders.isNotEmpty ? _activeOrders.first : null;
 
-      notifyListeners();
-    });
+          notifyListeners();
+        });
   }
 
   /// Watches for unassigned scheduled orders and triggers auto-assignment.
@@ -75,25 +78,28 @@ class OrderProvider extends ChangeNotifier {
         .where('pickupType', isEqualTo: 'scheduled')
         .snapshots()
         .listen((snapshot) {
-      for (final doc in snapshot.docs) {
-        final order = OrderModel.fromJson(doc.data());
+          for (final doc in snapshot.docs) {
+            final order = OrderModel.fromJson(doc.data());
 
-        // Skip if we're already processing this order
-        if (_autoAssigning.contains(order.orderId)) continue;
+            // Skip if we're already processing this order
+            if (_autoAssigning.contains(order.orderId)) continue;
 
-        // Only trigger for orders created recently (within the last 5 minutes)
-        // to avoid re-processing stale unassigned orders on app resume.
-        final age = DateTime.now().difference(order.createdAt);
-        if (age.inMinutes > 5) continue;
+            // Only trigger for orders created recently (within the last 5 minutes)
+            // to avoid re-processing stale unassigned orders on app resume.
+            final age = DateTime.now().difference(order.createdAt);
+            if (age.inMinutes > 5) continue;
 
-        _autoAssigning.add(order.orderId);
-        LeadService.instance.autoAssignScheduledOrder(order).then((assignedUid) {
-          _autoAssigning.remove(order.orderId);
-        }).catchError((_) {
-          _autoAssigning.remove(order.orderId);
+            _autoAssigning.add(order.orderId);
+            LeadService.instance
+                .autoAssignScheduledOrder(order)
+                .then((assignedUid) {
+                  _autoAssigning.remove(order.orderId);
+                })
+                .catchError((_) {
+                  _autoAssigning.remove(order.orderId);
+                });
+          }
         });
-      }
-    });
   }
 
   Future<bool> updateOrderStatus(String orderId, OrderStatus status) async {
@@ -212,8 +218,8 @@ class EarningsProvider extends ChangeNotifier {
   double _commissionDueBalance = 0;
   DateTime? _commissionDueAt;
   bool _commissionBlocked = false;
-  String _scrapwellUpiId = 'scrapwell@upi';
-  String _scrapwellPayeeName = 'Scrapwell';
+  String _scrapwellUpiId = 'ateshamali0@okicici';
+  String _scrapwellPayeeName = 'Atesham Ali';
   bool _isLoading = false;
   StreamSubscription<DocumentSnapshot>? _partnerWalletSub;
   StreamSubscription<DocumentSnapshot>? _paymentConfigSub;
@@ -239,44 +245,57 @@ class EarningsProvider extends ChangeNotifier {
           DateTime.now().isAfter(_commissionDueAt!));
   bool get isLoading => _isLoading;
 
+  /// Safely notify listeners after the current frame to avoid triggering
+  /// a rebuild while the rendering pipeline is still laying out.
+  bool _notifyScheduled = false;
+  void _safeNotifyListeners() {
+    if (_notifyScheduled) return;
+    _notifyScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _notifyScheduled = false;
+      notifyListeners();
+    });
+  }
+
   void listenToWallet() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
     _partnerWalletSub?.cancel();
-    _partnerWalletSub =
-        _db.collection('partners').doc(uid).snapshots().listen((doc) {
+    _partnerWalletSub = _db.collection('partners').doc(uid).snapshots().listen((
+      doc,
+    ) {
       final data = doc.data();
       if (data == null) return;
       _walletBalance = (data['walletBalance'] ?? 0.0).toDouble();
-      _commissionDueBalance =
-          (data['commissionDueBalance'] ?? 0.0).toDouble();
-      _commissionDueAt =
-          (data['commissionDueAt'] as Timestamp?)?.toDate();
+      _commissionDueBalance = (data['commissionDueBalance'] ?? 0.0).toDouble();
+      _commissionDueAt = (data['commissionDueAt'] as Timestamp?)?.toDate();
       _commissionBlocked = data['commissionBlocked'] ?? false;
-      notifyListeners();
+      _safeNotifyListeners();
     });
 
     _paymentConfigSub?.cancel();
-    _paymentConfigSub =
-        _db.collection('app_config').doc('payments').snapshots().listen((doc) {
-      final data = doc.data();
-      if (data == null) return;
-      _scrapwellUpiId = (data['scrapwellUpiId'] ?? _scrapwellUpiId).toString();
-      _scrapwellPayeeName =
-          (data['scrapwellPayeeName'] ?? _scrapwellPayeeName).toString();
-      notifyListeners();
-    });
+    _paymentConfigSub = _db
+        .collection('app_config')
+        .doc('payments')
+        .snapshots()
+        .listen((doc) {
+          final data = doc.data();
+          if (data == null) return;
+          _scrapwellUpiId =
+              (data['scrapwellUpiId'] ?? _scrapwellUpiId).toString();
+          _scrapwellPayeeName =
+              (data['scrapwellPayeeName'] ?? _scrapwellPayeeName).toString();
+          _safeNotifyListeners();
+        });
   }
 
   Future<void> loadEarnings() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    Future.microtask(() {
-      _isLoading = true;
-      notifyListeners();
-    });
+    _isLoading = true;
+    _safeNotifyListeners();
 
     try {
       final now = DateTime.now();
@@ -284,42 +303,40 @@ class EarningsProvider extends ChangeNotifier {
       final weekStart = now.subtract(Duration(days: now.weekday - 1));
       final monthStart = DateTime(now.year, now.month, 1);
 
-      final snap = await _db
-          .collection('orders')
-          .where('partnerId', isEqualTo: uid)
-          .where('status', isEqualTo: OrderStatus.completed.name)
-          .orderBy('completedAt', descending: true)
-          .get();
+      final snap =
+          await _db
+              .collection('orders')
+              .where('partnerId', isEqualTo: uid)
+              .where('status', isEqualTo: OrderStatus.completed.name)
+              .orderBy('completedAt', descending: true)
+              .get();
 
-      final orders = snap.docs
-          .map((d) => OrderModel.fromJson(d.data()))
-          .where((o) => o.completedAt != null)
-          .toList();
+      final orders =
+          snap.docs
+              .map((d) => OrderModel.fromJson(d.data()))
+              .where((o) => o.completedAt != null)
+              .toList();
 
       _todayEarnings = orders
           .where((o) => o.completedAt!.isAfter(todayStart))
           .fold(0, (sum, o) => sum + o.finalPayout);
-      _todayOrders = orders
-          .where((o) => o.completedAt!.isAfter(todayStart))
-          .length;
+      _todayOrders =
+          orders.where((o) => o.completedAt!.isAfter(todayStart)).length;
 
       _weekEarnings = orders
           .where((o) => o.completedAt!.isAfter(weekStart))
           .fold(0, (sum, o) => sum + o.finalPayout);
-      _weekOrders = orders
-          .where((o) => o.completedAt!.isAfter(weekStart))
-          .length;
+      _weekOrders =
+          orders.where((o) => o.completedAt!.isAfter(weekStart)).length;
 
       _monthEarnings = orders
           .where((o) => o.completedAt!.isAfter(monthStart))
           .fold(0, (sum, o) => sum + o.finalPayout);
-      _monthOrders = orders
-          .where((o) => o.completedAt!.isAfter(monthStart))
-          .length;
+      _monthOrders =
+          orders.where((o) => o.completedAt!.isAfter(monthStart)).length;
 
       // Wallet: fetch from partner doc
-      final partnerDoc =
-          await _db.collection('partners').doc(uid).get();
+      final partnerDoc = await _db.collection('partners').doc(uid).get();
       if (partnerDoc.exists) {
         _walletBalance =
             (partnerDoc.data()?['walletBalance'] ?? 0.0).toDouble();
@@ -327,13 +344,12 @@ class EarningsProvider extends ChangeNotifier {
             (partnerDoc.data()?['commissionDueBalance'] ?? 0.0).toDouble();
         _commissionDueAt =
             (partnerDoc.data()?['commissionDueAt'] as Timestamp?)?.toDate();
-        _commissionBlocked =
-            partnerDoc.data()?['commissionBlocked'] ?? false;
+        _commissionBlocked = partnerDoc.data()?['commissionBlocked'] ?? false;
       }
     } catch (_) {}
 
     _isLoading = false;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   void reset() {

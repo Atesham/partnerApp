@@ -146,7 +146,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
       if (uid == null) {
         setState(() {
           _isLoading = false;
-          _error = 'Authentication failed';
+          _error = context.t('authFailed');
         });
         _shakeOnError();
         return;
@@ -194,7 +194,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
         _navigateClearStack(const PendingApprovalScreen());
       }
     } on FirebaseAuthException catch (e) {
-      String msg = 'Verification failed';
+      String msg = context.t('verificationFailed');
       if (e.code == 'invalid-verification-code') msg = context.t('invalidOtp');
       if (e.code == 'session-expired') msg = context.t('otpExpired');
       setState(() {
@@ -247,7 +247,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
       phoneNumber: widget.phone,
       onCodeSent: (vId, _) {
         if (mounted)
-          AppTheme.showSnack(context, 'OTP resent!', isSuccess: true);
+          AppTheme.showSnack(context, context.t('otpResent'), isSuccess: true);
       },
       onError: (err) {
         if (mounted) AppTheme.showSnack(context, err, isError: true);
@@ -420,8 +420,8 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text(
-                    'OTP Verification',
+                  Text(
+                    context.t('otpVerification'),
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -451,7 +451,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
               height: 1.6,
             ),
             children: [
-              const TextSpan(text: 'We sent a 6-digit code to\n'),
+              TextSpan(text: '${context.t('otpSentCodeTo')}\n'),
               TextSpan(
                 text: widget.phone,
                 style: const TextStyle(
@@ -467,8 +467,8 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
         const SizedBox(height: 4),
         GestureDetector(
           onTap: _goBack,
-          child: const Text(
-            'Wrong number?',
+          child: Text(
+            context.t('wrongNumber'),
             style: TextStyle(
               color: AppTheme.primary,
               fontSize: 13,
@@ -500,8 +500,8 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Enter Code',
+              Text(
+                context.t('enterCode'),
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -519,18 +519,18 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                     color: AppTheme.primaryLight,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.check_circle_rounded,
                         color: AppTheme.primary,
                         size: 13,
                       ),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 4),
                       Text(
-                        'Verified',
-                        style: TextStyle(
+                        context.t('verifiedLabel'),
+                        style: const TextStyle(
                           color: AppTheme.primary,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -688,14 +688,14 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
             borderRadius: BorderRadius.circular(16),
             boxShadow: AppTheme.elevatedShadow,
           ),
-          child: const Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
-              SizedBox(width: 10),
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
+              const SizedBox(width: 10),
               Text(
-                'Verified!',
-                style: TextStyle(
+                context.t('verifiedLabel'),
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 17,
                   fontWeight: FontWeight.w800,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -44,9 +45,9 @@ class NotificationService {
 
   // Notification Channel configuration for Android 8.0+
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
-    'scrapwell_partner_channel', // id
-    'Scrapwell Partner Notifications', // name
-    description: 'Notifications for new leads, order updates, and account status', // description
+    'scrapwell_leads_channel',
+    'Scrapwell Lead Alerts',
+    description: 'High priority ringtone and vibration alerts for pickup leads',
     importance: Importance.max,
     playSound: true,
     enableVibration: true,
@@ -251,6 +252,7 @@ class NotificationService {
   /// Show a local notification when a new lead is detected in the stream
   Future<void> _showLocalLeadNotification(OrderModel order) async {
     final int id = order.orderId.hashCode.remainder(100000);
+    final vibrationPattern = Int64List.fromList([0, 800, 350, 800, 350, 1200]);
     
     final androidDetails = AndroidNotificationDetails(
       _channel.id,
@@ -260,6 +262,9 @@ class NotificationService {
       priority: Priority.high,
       playSound: true,
       enableVibration: true,
+      vibrationPattern: vibrationPattern,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.call,
       styleInformation: BigTextStyleInformation(
         'New instant pickup lead is available near ${order.customerAddress}. Tap to view details.',
       ),
@@ -298,6 +303,7 @@ class NotificationService {
 
     // Create unique ID for notification
     final int id = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+    final vibrationPattern = Int64List.fromList([0, 800, 350, 800, 350, 1200]);
 
     final androidDetails = AndroidNotificationDetails(
       _channel.id,
@@ -307,6 +313,9 @@ class NotificationService {
       priority: Priority.high,
       playSound: true,
       enableVibration: true,
+      vibrationPattern: vibrationPattern,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.call,
       styleInformation: BigTextStyleInformation(body),
     );
 

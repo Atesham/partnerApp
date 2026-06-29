@@ -14,7 +14,10 @@
 const {onDocumentWritten} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {initializeApp} = require("firebase-admin/app");
-const {getFirestore, FieldValue} = require("firebase-admin/firestore");
+const {
+  getFirestore,
+  FieldValue,
+} = require("firebase-admin/firestore");
 const {getMessaging} = require("firebase-admin/messaging");
 const {logger} = require("firebase-functions");
 
@@ -23,6 +26,10 @@ initializeApp();
 const db = getFirestore();
 const COMMISSION_RATE = 0.02;
 const COMMISSION_LIMIT = 500;
+const MAX_INSTANT_PARTNERS = 30;
+const LIVE_LOCATION_STALE_MS = 10 * 60 * 1000;
+const SCHEDULED_BUFFER_MINUTES = 30;
+const LEAD_CHANNEL_ID = "scrapwell_leads_channel";
 
 function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -61,6 +68,101 @@ function isCommissionBlocked(partner, now = new Date()) {
   if (due >= COMMISSION_LIMIT) return true;
   const dueAt = partner.commissionDueAt?.toDate?.();
   return Boolean(dueAt && dueAt.getTime() < now.getTime());
+}
+
+function orderCategoriesMatch(order, partner) {
+  const orderCats = (order.scrapItems || [])
+    .map((i) => (i.category || "").trim().toLowerCase())
+    .filter(Boolean);
+  const partnerCats = (partner.scrapCategories || [])
+    .map((c) => (c || "").trim().toLowerCase())
+    .filter(Boolean);
+  if (orderCats.length === 0 || partnerCats.length === 0) return true;
+  return orderCats.some((c) => partnerCats.includes(c));
+}
+
+function parseScheduledDate(order) {
+  if (order.scheduledAt?.toDate) return order.scheduledAt.toDate();
+  const fallback = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const slot = (order.pickupSlot || "").split(",");
+  try {
+    const datePart = (slot[0] || "").trim().toLowerCase();
+    let date = fallback;
+    if (datePart === "today") {
+      const now = new Date();
+      date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (datePart === "tomorrow") {
+      const now = new Date();
+      date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    } else if (datePart) {
+      date = new Date(datePart);
+    }
+    const timePart = (slot[1] || "").trim().toUpperCase();
+    const match = /(\d+)\s*(AM|PM)/.exec(timePart.split("-")[0] || "");
+    if (!match) return new Date(date.setHours(12, 0, 0, 0));
+    let hour = Number(match[1]);
+    if (match[2] === "PM" && hour < 12) hour += 12;
+    if (match[2] === "AM" && hour === 12) hour = 0;
+    return new Date(date.setHours(hour, 0, 0, 0));
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function isWithinWorkingHours(partner, time) {
+  try {
+    const [sh, sm] = (partner.workingHoursStart || "09:00")
+      .split(":")
+      .map(Number);
+    const [eh, em] = (partner.workingHoursEnd || "18:00")
+      .split(":")
+      .map(Number);
+    const start = sh * 60 + sm;
+    const end = eh * 60 + em;
+    const current = time.getHours() * 60 + time.getMinutes();
+    return end > start
+      ? current >= start && current <= end
+      : current >= start || current <= end;
+  } catch (_) {
+    return true;
+  }
+}
+
+function parseReservedSlot(slot) {
+  try {
+    const parts = (slot.slot || "").split(",");
+    const datePart = (parts[0] || slot.date || "").trim().toLowerCase();
+    let date;
+    if (datePart === "today") {
+      const now = new Date();
+      date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (datePart === "tomorrow") {
+      const now = new Date();
+      date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    } else {
+      date = new Date(datePart);
+    }
+    const timePart = (parts[1] || "").trim().toUpperCase();
+    const match = /(\d+)\s*(AM|PM)/.exec(timePart.split("-")[0] || "");
+    if (match) {
+      let hour = Number(match[1]);
+      if (match[2] === "PM" && hour < 12) hour += 12;
+      if (match[2] === "AM" && hour === 12) hour = 0;
+      date.setHours(hour, 0, 0, 0);
+    }
+    return Number.isNaN(date.getTime()) ? null : date;
+  } catch (_) {
+    return null;
+  }
+}
+
+function hasSlotConflict(partner, scheduledTime) {
+  return (partner.reservedSlots || []).some((slot) => {
+    const slotTime = parseReservedSlot(slot);
+    if (!slotTime) return false;
+    const diff = Math.abs(slotTime.getTime() - scheduledTime.getTime());
+    return diff < SCHEDULED_BUFFER_MINUTES * 60 * 1000;
+  });
 }
 
 async function pausePartnerForCommission(partnerId, partner, now = new Date()) {
@@ -122,6 +224,192 @@ async function sendToTokens(tokens, payload) {
   }
 }
 
+function leadPayload({order, orderId, pickupType, title, body}) {
+  return {
+    notification: {title, body},
+    data: {
+      orderId,
+      pickupType,
+      click_action: "FLUTTER_NOTIFICATION_CLICK",
+      type: "new_order",
+      sound: "default",
+    },
+    android: {
+      priority: "high",
+      ttl: 90 * 1000,
+      notification: {
+        channelId: LEAD_CHANNEL_ID,
+        priority: "max",
+        sound: "default",
+        defaultSound: true,
+        defaultVibrateTimings: true,
+        visibility: "public",
+        notificationCount: 1,
+      },
+    },
+    apns: {
+      headers: {"apns-priority": "10"},
+      payload: {
+        aps: {
+          alert: {title, body},
+          sound: "default",
+          badge: 1,
+        },
+      },
+    },
+  };
+}
+
+async function findInstantPartners(order, now) {
+  const orderLat = toNumber(order.customerLat);
+  const orderLng = toNumber(order.customerLng);
+  const liveSnap = await db
+    .collection("live_locations")
+    .where("isOnline", "==", true)
+    .where("isAvailable", "==", true)
+    .get();
+
+  const candidates = [];
+  await Promise.all(liveSnap.docs.map(async (liveDoc) => {
+    const live = liveDoc.data();
+    const updatedAt = live.updatedAt?.toDate?.();
+    if (updatedAt && now.getTime() - updatedAt.getTime() > LIVE_LOCATION_STALE_MS) {
+      return;
+    }
+
+    const partnerId = live.partnerId || liveDoc.id;
+    const partnerSnap = await db.collection("partners").doc(partnerId).get();
+    if (!partnerSnap.exists) return;
+    const partner = partnerSnap.data();
+    if (partner.status !== "approved") return;
+    if (partner.deleted === true) return;
+    if (!partner.fcmToken || partner.fcmToken.trim() === "") return;
+    if (isCommissionBlocked(partner, now)) {
+      await pausePartnerForCommission(partnerId, partner, now);
+      return;
+    }
+    if (!orderCategoriesMatch(order, partner)) return;
+
+    const pLat = toNumber(live.latitude || partner.currentLat || partner.shopLat);
+    const pLng = toNumber(live.longitude || partner.currentLng || partner.shopLng);
+    const maxKm = Math.min(
+      toNumber(live.maxDistanceKm || partner.maxDistanceKm) || 10,
+      30
+    );
+    if (pLat === 0 && pLng === 0) return;
+    const distanceKm = haversineKm(pLat, pLng, orderLat, orderLng);
+    if (distanceKm > maxKm) return;
+
+    candidates.push({
+      partnerId,
+      token: partner.fcmToken,
+      distanceKm,
+    });
+  }));
+
+  candidates.sort((a, b) => a.distanceKm - b.distanceKm);
+  return candidates.slice(0, MAX_INSTANT_PARTNERS);
+}
+
+async function assignScheduledOrder(orderId, order, now) {
+  const scheduledTime = parseScheduledDate(order);
+  const orderLat = toNumber(order.customerLat);
+  const orderLng = toNumber(order.customerLng);
+  const snap = await db
+    .collection("partners")
+    .where("status", "==", "approved")
+    .get();
+
+  const candidates = [];
+  for (const doc of snap.docs) {
+    const partner = doc.data();
+    if (partner.deleted === true) continue;
+    if (!partner.fcmToken || partner.fcmToken.trim() === "") continue;
+    if (isCommissionBlocked(partner, now)) {
+      await pausePartnerForCommission(doc.id, partner, now);
+      continue;
+    }
+    if (!orderCategoriesMatch(order, partner)) continue;
+    if (!isWithinWorkingHours(partner, scheduledTime)) continue;
+    if (hasSlotConflict(partner, scheduledTime)) continue;
+    if ((partner.reservedSlots || []).length >= (partner.maxScheduledSlots || 10)) {
+      continue;
+    }
+
+    const pLat = toNumber(partner.currentLat || partner.shopLat);
+    const pLng = toNumber(partner.currentLng || partner.shopLng);
+    const distanceKm = haversineKm(pLat, pLng, orderLat, orderLng);
+    if (distanceKm > (toNumber(partner.maxDistanceKm) || 15)) continue;
+
+    candidates.push({
+      partnerId: doc.id,
+      partner,
+      distanceKm,
+      rosterLoad: (partner.reservedSlots || []).length,
+    });
+  }
+
+  candidates.sort((a, b) =>
+    a.rosterLoad - b.rosterLoad || a.distanceKm - b.distanceKm
+  );
+  const selected = candidates[0];
+  if (!selected) return null;
+
+  const dateStr = [
+    scheduledTime.getFullYear(),
+    String(scheduledTime.getMonth() + 1).padStart(2, "0"),
+    String(scheduledTime.getDate()).padStart(2, "0"),
+  ].join("-");
+  const newSlot = {
+    date: dateStr,
+    slot: order.pickupSlot || "",
+    orderId,
+  };
+
+  await db.runTransaction(async (tx) => {
+    const orderRef = db.collection("orders").doc(orderId);
+    const partnerRef = db.collection("partners").doc(selected.partnerId);
+    const orderSnap = await tx.get(orderRef);
+    const partnerSnap = await tx.get(partnerRef);
+    if (!orderSnap.exists || !partnerSnap.exists) {
+      throw new Error("Order or partner missing");
+    }
+    const freshOrder = orderSnap.data();
+    if (freshOrder.status !== "searchingPartner") {
+      throw new Error("Order already assigned");
+    }
+    const freshPartner = partnerSnap.data();
+    const freshSlots = freshPartner.reservedSlots || [];
+    if (hasSlotConflict(freshPartner, scheduledTime)) {
+      throw new Error("Fresh slot conflict");
+    }
+    if (freshSlots.length >= (freshPartner.maxScheduledSlots || 10)) {
+      throw new Error("Fresh capacity full");
+    }
+
+    tx.update(orderRef, {
+      partnerId: selected.partnerId,
+      partnerName: freshPartner.fullName || "",
+      partnerPhone: freshPartner.phone || "",
+      partnerShopName: freshPartner.shopName || "",
+      reservedPartnerId: selected.partnerId,
+      status: "reserved",
+      assignedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    tx.update(partnerRef, {
+      reservedSlots: [...freshSlots, newSlot],
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    tx.set(db.collection("live_locations").doc(selected.partnerId), {
+      assignedScheduledOrderId: orderId,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, {merge: true});
+  });
+
+  return selected;
+}
+
 exports.notifyPartnersOnNewOrder = onDocumentWritten(
   "orders/{orderId}",
   async (event) => {
@@ -134,57 +422,8 @@ exports.notifyPartnersOnNewOrder = onDocumentWritten(
 
     const order = after;
     const orderId = event.params.orderId;
-    const orderLat = toNumber(order.customerLat);
-    const orderLng = toNumber(order.customerLng);
     const pickupType = order.pickupType || "instant";
-
-    const partnersSnap = await db
-      .collection("partners")
-      .where("status", "==", "approved")
-      .where("isOnline", "==", true)
-      .where("isAvailable", "==", true)
-      .get();
-
-    const tokens = [];
     const now = new Date();
-
-    for (const doc of partnersSnap.docs) {
-      const partner = doc.data();
-      if (!partner.fcmToken || partner.fcmToken.trim() === "") continue;
-      if (isCommissionBlocked(partner, now)) {
-        await pausePartnerForCommission(doc.id, partner, now);
-        continue;
-      }
-
-      if (pickupType === "instant") {
-        const pLat = toNumber(partner.currentLat || partner.shopLat);
-        const pLng = toNumber(partner.currentLng || partner.shopLng);
-        const maxKm = Math.min(toNumber(partner.maxDistanceKm) || 10, 30);
-        if (pLat === 0 && pLng === 0) continue;
-        if (haversineKm(pLat, pLng, orderLat, orderLng) > maxKm) continue;
-
-        const orderCats = (order.scrapItems || [])
-          .map((i) => (i.category || "").trim().toLowerCase())
-          .filter(Boolean);
-        const partnerCats = (partner.scrapCategories || [])
-          .map((c) => (c || "").trim().toLowerCase());
-        if (
-          orderCats.length > 0 &&
-          partnerCats.length > 0 &&
-          !orderCats.some((c) => partnerCats.includes(c))
-        ) {
-          continue;
-        }
-      }
-
-      tokens.push(partner.fcmToken);
-    }
-
-    if (tokens.length === 0) {
-      logger.info(`No eligible tokens for order ${orderId}.`);
-      return null;
-    }
-
     const estimatedPayout = order.estimatedPayout
       ? `Rs ${Math.round(order.estimatedPayout)}`
       : "Check app";
@@ -195,35 +434,43 @@ exports.notifyPartnersOnNewOrder = onDocumentWritten(
       ? `${order.areaName || order.customerAddress} - Est. ${estimatedPayout}`
       : `${order.pickupSlot} - ${order.areaName || order.customerAddress}`;
 
-    await sendToTokens(tokens, {
-      notification: {title, body},
-      data: {
+    if (pickupType === "scheduled") {
+      const assigned = await assignScheduledOrder(orderId, order, now);
+      if (!assigned) {
+        logger.info(`No scheduled partner available for order ${orderId}.`);
+        return null;
+      }
+      await sendToTokens([assigned.partner.fcmToken], leadPayload({
+        order,
         orderId,
         pickupType,
-        click_action: "FLUTTER_NOTIFICATION_CLICK",
-        type: "new_order",
-      },
-      android: {
-        priority: "high",
-        ttl: 60 * 1000,
-        notification: {
-          channelId: "scrapwell_partner_channel",
-          priority: "max",
-          defaultSound: true,
-          defaultVibrateTimings: true,
-        },
-      },
-      apns: {
-        headers: {"apns-priority": "10"},
-        payload: {
-          aps: {
-            alert: {title, body},
-            sound: "default",
-            badge: 1,
-          },
-        },
-      },
-    });
+        title: "Scheduled pickup assigned",
+        body,
+      }));
+      logger.info(`Scheduled order ${orderId} assigned to ${assigned.partnerId}.`);
+      return null;
+    }
+
+    const candidates = await findInstantPartners(order, now);
+    const tokens = candidates.map((c) => c.token);
+    if (tokens.length === 0) {
+      logger.info(`No eligible instant partners for order ${orderId}.`);
+      return null;
+    }
+
+    await db.collection("orders").doc(orderId).set({
+      eligiblePartnerIds: candidates.map((c) => c.partnerId),
+      leadBroadcastedAt: FieldValue.serverTimestamp(),
+      leadBroadcastCount: FieldValue.increment(1),
+    }, {merge: true});
+
+    await sendToTokens(tokens, leadPayload({
+      order,
+      orderId,
+      pickupType,
+      title,
+      body,
+    }));
 
     return null;
   }

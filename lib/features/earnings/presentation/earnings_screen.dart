@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/l10n/app_localizations.dart';
 import '../../../core/providers/order_provider.dart';
 import '../../../core/widgets/shared_widgets.dart';
 
@@ -36,11 +37,25 @@ class _EarningsScreenState extends State<EarningsScreen> {
         'tn': 'Scrapwell partner commission',
       },
     );
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        if (!mounted) return;
+        AppTheme.showSnack(
+          context,
+          context.t('noUpiApp').replaceAll('{upiId}', _earnings.scrapwellUpiId),
+          isError: true,
+        );
+      }
+    } catch (e) {
       if (!mounted) return;
       AppTheme.showSnack(
         context,
-        'No UPI app found. Pay to ${_earnings.scrapwellUpiId}.',
+        context.t('noUpiApp').replaceAll('{upiId}', _earnings.scrapwellUpiId),
         isError: true,
       );
     }
@@ -53,7 +68,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
     final uri = Uri.parse('https://wa.me/918744081962?text=$message');
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
-      AppTheme.showSnack(context, 'Unable to open WhatsApp.', isError: true);
+      AppTheme.showSnack(context, context.t('unableWhatsapp'), isError: true);
     }
   }
 
@@ -109,9 +124,9 @@ class _EarningsScreenState extends State<EarningsScreen> {
       snap: true,
       elevation: 0,
       titleSpacing: 20,
-      title: const Text(
-        'My Earnings',
-        style: TextStyle(
+      title: Text(
+        context.t('myEarnings'),
+        style: const TextStyle(
           fontWeight: FontWeight.w800,
           fontSize: 22,
           color: AppTheme.textPrimary,
@@ -124,7 +139,11 @@ class _EarningsScreenState extends State<EarningsScreen> {
   // Period Picker
   // ─────────────────────────────────────────────────────────────
   Widget _buildPeriodPicker() {
-    final periods = ['Today', 'This Week', 'This Month'];
+    final periods = [
+      context.t('today'),
+      context.t('thisWeek'),
+      context.t('thisMonth'),
+    ];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -176,7 +195,12 @@ class _EarningsScreenState extends State<EarningsScreen> {
         : _selectedPeriod == 1
             ? _earnings.weekOrders
             : _earnings.monthOrders;
-    final periodLabel = ['Today', 'This Week', 'This Month'][_selectedPeriod];
+    final periodLabels = [
+      context.t('today'),
+      context.t('thisWeek'),
+      context.t('thisMonth'),
+    ];
+    final periodLabel = periodLabels[_selectedPeriod];
 
     if (_earnings.isLoading) {
       return const SkeletonBox(width: double.infinity, height: 110, radius: 20);
@@ -200,7 +224,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Earned $periodLabel',
+                  '${context.t('earnedPeriod')} $periodLabel',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 13,
@@ -227,7 +251,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        '$orders pickup${orders == 1 ? '' : 's'} done',
+                        '$orders ${orders == 1 ? context.t('pickupDone') : context.t('pickupsDone')}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
@@ -265,25 +289,25 @@ class _EarningsScreenState extends State<EarningsScreen> {
     final stats = [
       _StatItem(
         icon: Icons.today_rounded,
-        label: "Today's Earnings",
+        label: context.t('todayEarningsLabel'),
         value: '₹${_earnings.todayEarnings.toStringAsFixed(0)}',
         color: AppTheme.primary,
       ),
       _StatItem(
         icon: Icons.calendar_view_week_rounded,
-        label: "Week's Earnings",
+        label: context.t('weekEarningsLabel'),
         value: '₹${_earnings.weekEarnings.toStringAsFixed(0)}',
         color: AppTheme.info,
       ),
       _StatItem(
         icon: Icons.inventory_2_rounded,
-        label: "Today's Orders",
+        label: context.t('todayOrdersLabel'),
         value: '${_earnings.todayOrders}',
         color: AppTheme.warning,
       ),
       _StatItem(
         icon: Icons.bar_chart_rounded,
-        label: "Week's Orders",
+        label: context.t('weekOrdersLabel'),
         value: '${_earnings.weekOrders}',
         color: const Color(0xFF8B5CF6),
       ),
@@ -362,9 +386,9 @@ class _EarningsScreenState extends State<EarningsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'This Week at a Glance',
-                style: TextStyle(
+              Text(
+                context.t('weekAtGlance'),
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                   color: AppTheme.textPrimary,
@@ -377,9 +401,9 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   color: AppTheme.primaryLight,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Text(
-                  'Weekly',
-                  style: TextStyle(
+                child: Text(
+                  context.t('weekly'),
+                  style: const TextStyle(
                     color: AppTheme.primary,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -391,21 +415,21 @@ class _EarningsScreenState extends State<EarningsScreen> {
           const SizedBox(height: 14),
           _performanceRow(
             Icons.payments_rounded,
-            'Avg. Per Pickup',
+            context.t('avgPerPickup'),
             '₹${avgPerOrder.toStringAsFixed(0)}',
             AppTheme.primary,
           ),
           const Divider(height: 20, color: AppTheme.divider),
           _performanceRow(
             Icons.inventory_2_rounded,
-            'Total Pickups',
-            '${_earnings.weekOrders} orders',
+            context.t('totalPickups'),
+            '${_earnings.weekOrders} ${context.t('ordersText')}',
             AppTheme.info,
           ),
           const Divider(height: 20, color: AppTheme.divider),
           _performanceRow(
             Icons.account_balance_wallet_rounded,
-            'Total Earned',
+            context.t('totalEarned'),
             '₹${_earnings.weekEarnings.toStringAsFixed(0)}',
             AppTheme.success,
           ),
@@ -456,7 +480,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
   Widget _buildCommissionDueCard() {
     final dueAt = _earnings.commissionDueAt;
     final dueText = dueAt == null
-        ? 'Every Tuesday'
+        ? context.t('everyTuesday')
         : '${dueAt.day}/${dueAt.month}/${dueAt.year}';
     final blocked = _earnings.shouldBlockForCommission;
     final hasDue = _earnings.hasCommissionDue;
@@ -504,10 +528,10 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 Expanded(
                   child: Text(
                     blocked
-                        ? 'Account Blocked – Pay commission to continue'
+                        ? context.t('accountBlocked')
                         : hasDue
-                            ? 'Commission payment pending'
-                            : 'No commission due – You\'re all clear!',
+                            ? context.t('commissionPending')
+                            : context.t('commissionClear'),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -533,9 +557,9 @@ class _EarningsScreenState extends State<EarningsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Due Balance',
-                            style: TextStyle(
+                          Text(
+                            context.t('dueBalance'),
+                            style: const TextStyle(
                               fontSize: 12,
                               color: AppTheme.textSecondary,
                               fontWeight: FontWeight.w600,
@@ -563,7 +587,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        hasDue ? 'PAY NOW' : 'CLEAR',
+                        hasDue ? context.t('payNow') : context.t('clearText'),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
@@ -580,12 +604,12 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 const SizedBox(height: 14),
 
                 // Info rows
-                _infoRow(Icons.percent_rounded, 'Commission Rate',
-                    '2% of each completed order'),
+                _infoRow(Icons.percent_rounded, context.t('commissionRate'),
+                    context.t('commissionRateValue')),
                 const SizedBox(height: 10),
-                _infoRow(Icons.calendar_today_rounded, 'Pay By', dueText),
+                _infoRow(Icons.calendar_today_rounded, context.t('payBy'), dueText),
                 const SizedBox(height: 10),
-                _infoRow(Icons.account_balance_rounded, 'UPI ID',
+                _infoRow(Icons.account_balance_rounded, context.t('upiId'),
                     _earnings.scrapwellUpiId),
 
                 const SizedBox(height: 18),
@@ -599,8 +623,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     icon: const Icon(Icons.payment_rounded, size: 18),
                     label: Text(
                       hasDue
-                          ? 'Pay ₹${_earnings.commissionDueBalance.toStringAsFixed(0)} via UPI'
-                          : 'Nothing to Pay',
+                          ? context.t('payViaUpi').replaceAll('{amount}', _earnings.commissionDueBalance.toStringAsFixed(0))
+                          : context.t('nothingToPay'),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accentColor,
@@ -626,7 +650,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _confirmCommissionOnWhatsApp,
                       icon: const Icon(Icons.chat_rounded, size: 18),
-                      label: const Text('Already paid? Notify on WhatsApp'),
+                      label: Text(context.t('alreadyPaidWhatsapp')),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.primary,
                         side: const BorderSide(color: AppTheme.primary),
@@ -649,8 +673,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Payment opens in your UPI app. '
-                        'Due balance is cleared after Scrapwell verifies the transfer.',
+                        context.t('upiPaymentNote'),
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppTheme.textHint,

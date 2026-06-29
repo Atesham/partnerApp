@@ -58,9 +58,9 @@ class _LoginScreenState extends State<LoginScreen>
       context,
       MaterialPageRoute(
         builder:
-            (_) => const PolicyDetailScreen(
+            (_) => PolicyDetailScreen(
               policyKey: 'terms',
-              title: 'Terms & Conditions',
+              title: context.t('termsAndConditions'),
             ),
       ),
     );
@@ -71,9 +71,9 @@ class _LoginScreenState extends State<LoginScreen>
       context,
       MaterialPageRoute(
         builder:
-            (_) => const PolicyDetailScreen(
+            (_) => PolicyDetailScreen(
               policyKey: 'privacy',
-              title: 'Privacy Policy',
+              title: context.t('privacyPolicy'),
             ),
       ),
     );
@@ -202,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'We\'ll send a verification code to your number',
+                          context.t('loginSubtitle'),
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 36),
@@ -268,9 +268,9 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                                   validator: (v) {
                                     if (v == null || v.isEmpty)
-                                      return 'Phone number required';
+                                      return context.t('phoneRequired');
                                     if (v.length < 10)
-                                      return 'Enter 10-digit number';
+                                      return context.t('phoneInvalid');
                                     return null;
                                   },
                                 ),
@@ -289,11 +289,11 @@ class _LoginScreenState extends State<LoginScreen>
                               height: 1.4,
                             ),
                             children: [
-                              const TextSpan(
-                                text: 'By continuing, you agree to our ',
+                              TextSpan(
+                                text: context.t('agreePrefix'),
                               ),
                               TextSpan(
-                                text: 'Terms & Conditions',
+                                text: context.t('termsAndConditions'),
                                 style: const TextStyle(
                                   color: AppTheme.primary,
                                   fontWeight: FontWeight.w700,
@@ -301,9 +301,9 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 recognizer: _termsRecognizer,
                               ),
-                              const TextSpan(text: ' and '),
+                              TextSpan(text: context.t('andText')),
                               TextSpan(
-                                text: 'Privacy Policy',
+                                text: context.t('privacyPolicy'),
                                 style: const TextStyle(
                                   color: AppTheme.primary,
                                   fontWeight: FontWeight.w700,
@@ -342,9 +342,9 @@ class _LoginScreenState extends State<LoginScreen>
 
   Widget _buildBenefits(BuildContext context) {
     final benefits = [
-      (Icons.payments_rounded, 'Earn ₹500–₹1500 per day'),
-      (Icons.flash_on_rounded, 'Accept pickups in seconds'),
-      (Icons.security_rounded, 'Secure & verified customers'),
+      (Icons.payments_rounded, context.t('benefitEarn')),
+      (Icons.flash_on_rounded, context.t('benefitAccept')),
+      (Icons.security_rounded, context.t('benefitSecure')),
     ];
     return Column(
       children:
