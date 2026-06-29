@@ -11,15 +11,15 @@
  * - Pause partners when due is overdue or reaches Rs 500.
  */
 
-const {onDocumentWritten} = require("firebase-functions/v2/firestore");
-const {onSchedule} = require("firebase-functions/v2/scheduler");
-const {initializeApp} = require("firebase-admin/app");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { initializeApp } = require("firebase-admin/app");
 const {
   getFirestore,
   FieldValue,
 } = require("firebase-admin/firestore");
-const {getMessaging} = require("firebase-admin/messaging");
-const {logger} = require("firebase-functions");
+const { getMessaging } = require("firebase-admin/messaging");
+const { logger } = require("firebase-functions");
 
 initializeApp();
 
@@ -38,9 +38,9 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) *
+    Math.sin(dLng / 2);
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
@@ -177,13 +177,13 @@ async function pausePartnerForCommission(partnerId, partner, now = new Date()) {
   };
 
   await Promise.all([
-    db.collection("partners").doc(partnerId).set(updates, {merge: true}),
+    db.collection("partners").doc(partnerId).set(updates, { merge: true }),
     db.collection("live_locations").doc(partnerId).set({
       isOnline: false,
       isAvailable: false,
       assignedOrderId: null,
       updatedAt: FieldValue.serverTimestamp(),
-    }, {merge: true}),
+    }, { merge: true }),
   ]);
   return true;
 }
@@ -218,15 +218,15 @@ async function sendToTokens(tokens, payload) {
         .limit(1)
         .get();
       if (!staleSnap.empty) {
-        await staleSnap.docs[0].ref.update({fcmToken: null});
+        await staleSnap.docs[0].ref.update({ fcmToken: null });
       }
     }));
   }
 }
 
-function leadPayload({order, orderId, pickupType, title, body}) {
+function leadPayload({ order, orderId, pickupType, title, body }) {
   return {
-    notification: {title, body},
+    notification: { title, body },
     data: {
       orderId,
       pickupType,
@@ -248,10 +248,10 @@ function leadPayload({order, orderId, pickupType, title, body}) {
       },
     },
     apns: {
-      headers: {"apns-priority": "10"},
+      headers: { "apns-priority": "10" },
       payload: {
         aps: {
-          alert: {title, body},
+          alert: { title, body },
           sound: "default",
           badge: 1,
         },
@@ -404,7 +404,7 @@ async function assignScheduledOrder(orderId, order, now) {
     tx.set(db.collection("live_locations").doc(selected.partnerId), {
       assignedScheduledOrderId: orderId,
       updatedAt: FieldValue.serverTimestamp(),
-    }, {merge: true});
+    }, { merge: true });
   });
 
   return selected;
@@ -462,7 +462,7 @@ exports.notifyPartnersOnNewOrder = onDocumentWritten(
       eligiblePartnerIds: candidates.map((c) => c.partnerId),
       leadBroadcastedAt: FieldValue.serverTimestamp(),
       leadBroadcastCount: FieldValue.increment(1),
-    }, {merge: true});
+    }, { merge: true });
 
     await sendToTokens(tokens, leadPayload({
       order,
@@ -584,7 +584,7 @@ exports.handleOrderCompletion = onDocumentWritten(
           totalEarnings: FieldValue.increment(finalPayout),
           totalOrders: FieldValue.increment(1),
           updatedAt: FieldValue.serverTimestamp(),
-        }, {merge: true});
+        }, { merge: true });
 
         if (blocked) {
           tx.set(db.collection("live_locations").doc(partnerId), {
@@ -592,7 +592,7 @@ exports.handleOrderCompletion = onDocumentWritten(
             isAvailable: false,
             assignedOrderId: null,
             updatedAt: FieldValue.serverTimestamp(),
-          }, {merge: true});
+          }, { merge: true });
         }
       });
 
