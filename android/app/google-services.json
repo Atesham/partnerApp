@@ -26,6 +26,25 @@
     },
     {
       "client_info": {
+        "mobilesdk_app_id": "1:124131366432:android:e0f8d6c95a74dd2e954e45",
+        "android_client_info": {
+          "package_name": "com.scrapwell.customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBoR09zrnAksJOv_LrQ7hcEwH5R3xCJEM0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:124131366432:android:17db81b99cd52643954e45",
         "android_client_info": {
           "package_name": "com.scrapwell.partner"

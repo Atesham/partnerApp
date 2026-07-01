@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../firebase_options.dart';
 import '../../../core/providers/partner_provider.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../language/presentation/language_selection_screen.dart';
 import '../../main/presentation/main_screen.dart';
 import '../../registration/presentation/registration_screen.dart';
@@ -37,19 +36,24 @@ class _SplashScreenState extends State<SplashScreen>
 
     _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.0, 0.6, curve: Curves.easeOut)),
+        parent: _controller,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      ),
     );
     _scaleAnim = Tween<double>(begin: 0.7, end: 1.0).animate(
       CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.0, 0.6, curve: Curves.elasticOut)),
+        parent: _controller,
+        curve: const Interval(0.0, 0.6, curve: Curves.elasticOut),
+      ),
     );
-    _slideAnim =
-        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.22),
+      end: Offset.zero,
+    ).animate(
       CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.2, 0.8, curve: Curves.easeOut)),
+        parent: _controller,
+        curve: const Interval(0.2, 0.85, curve: Curves.easeOutCubic),
+      ),
     );
 
     _controller.forward();
@@ -84,7 +88,6 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<Widget> _checkAuthStatus() async {
-    // Load saved locale
     await initLocale();
 
     final prefs = await SharedPreferences.getInstance();
@@ -105,7 +108,6 @@ class _SplashScreenState extends State<SplashScreen>
       throw Exception(partner.error);
     }
 
-    // Update FCM Push Token on login
     await NotificationService.instance.updateFcmToken();
 
     if (!partner.hasProfile) {
@@ -123,8 +125,8 @@ class _SplashScreenState extends State<SplashScreen>
       context,
       PageRouteBuilder(
         pageBuilder: (_, a, __) => screen,
-        transitionsBuilder: (_, a, __, child) =>
-            FadeTransition(opacity: a, child: child),
+        transitionsBuilder:
+            (_, a, __, child) => FadeTransition(opacity: a, child: child),
         transitionDuration: const Duration(milliseconds: 500),
       ),
     );
@@ -140,208 +142,169 @@ class _SplashScreenState extends State<SplashScreen>
       ),
       child: Scaffold(
         body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF064E3B),
-              Color(0xFF065F46),
-              Color(0xFF047857),
-              Color(0xFF059669),
-            ],
-            stops: [0.0, 0.3, 0.6, 1.0],
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.primaryDeep,
+                Color(0xFF065F46),
+                Color(0xFF047857),
+                AppTheme.primaryDark,
+              ],
+              stops: [0.0, 0.34, 0.68, 1.0],
+            ),
           ),
-        ),
-        child: Stack(
-          children: [
-            // Background circles
-            Positioned(
-              top: -100,
-              right: -80,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.04),
+          child: Stack(
+            children: [
+              Positioned(
+                top: -120,
+                right: -90,
+                child: Container(
+                  width: 320,
+                  height: 320,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.05),
+                  ),
                 ),
               ),
-            ),
-            Positioned(
-              bottom: -120,
-              left: -60,
-              child: Container(
-                width: 350,
-                height: 350,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
+              Positioned(
+                bottom: -140,
+                left: -80,
+                child: Container(
+                  width: 360,
+                  height: 360,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.06),
+                  ),
                 ),
               ),
-            ),
-            Positioned(
-              top: 200,
-              left: -40,
-              child: Container(
-                width: 160,
-                height: 160,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.03),
-                ),
-              ),
-            ),
-
-            // Main content
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Logo icon
-                  ScaleTransition(
-                    scale: _scaleAnim,
-                    child: FadeTransition(
-                      opacity: _fadeAnim,
-                      child: Container(
-                        width: 96,
-                        height: 96,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(28),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1.5,
+              Center(
+                child: SafeArea(
+                  child: Column(
+                    children: [
+                      const Spacer(flex: 4),
+                      ScaleTransition(
+                        scale: _scaleAnim,
+                        child: FadeTransition(
+                          opacity: _fadeAnim,
+                          child: Container(
+                            width: 132,
+                            height: 132,
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.18),
+                                  blurRadius: 30,
+                                  offset: const Offset(0, 16),
+                                ),
+                                BoxShadow(
+                                  color: Colors.white.withOpacity(0.28),
+                                  blurRadius: 0,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Image.asset(
+                              'assets/icons/app_icon.png',
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                            ),
                           ),
-                        ),
-                        child: const Icon(
-                          Icons.recycling_rounded,
-                          size: 52,
-                          color: Colors.white,
                         ),
                       ),
-                    ),
+                      const Spacer(flex: 5),
+                    ],
                   ),
-
-                  const SizedBox(height: 24),
-
-                  // App name
-                  SlideTransition(
+                ),
+              ),
+              Positioned(
+                bottom: 46,
+                left: 28,
+                right: 28,
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: SlideTransition(
                     position: _slideAnim,
-                    child: FadeTransition(
-                      opacity: _fadeAnim,
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Scrapwell',
-                            style: TextStyle(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_error != null) ...[
+                          Text(
+                            _friendlyError(_error!),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 34,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
-                              height: 1.1,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              height: 1.35,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: Colors.white.withOpacity(0.25)),
-                            ),
-                            child: const Text(
-                              'PARTNER',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 3,
+                          const SizedBox(height: 14),
+                          ElevatedButton.icon(
+                            onPressed: _navigate,
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Retry'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: AppTheme.primaryDeep,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 22,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                        ] else ...[
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              minHeight: 5,
+                              backgroundColor: Colors.white.withOpacity(0.18),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white.withOpacity(0.92),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           Text(
-                            'Earn more from nearby pickups',
+                            'Preparing your partner workspace',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.75),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withOpacity(0.72),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
                             ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-
-            // Bottom loading / error retry
-            Positioned(
-              bottom: 60,
-              left: 24,
-              right: 24,
-              child: FadeTransition(
-                opacity: _fadeAnim,
-                child: Column(
-                  children: [
-                    if (_error != null) ...[
-                      Text(
-                        _error!.contains('network') || _error!.contains('Unavailable') || _error!.contains('connection')
-                            ? 'Connection error. Please check your internet connection.'
-                            : _error!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      ElevatedButton.icon(
-                        onPressed: _navigate,
-                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                        label: const Text('Retry'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF064E3B),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 2,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        ),
-                      ),
-                    ] else ...[
-                      SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(
-                          color: Colors.white.withOpacity(0.7),
-                          strokeWidth: 2.5,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Powered by Scrapwell',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
+
+  String _friendlyError(String error) {
+    final lower = error.toLowerCase();
+    if (lower.contains('network') ||
+        lower.contains('unavailable') ||
+        lower.contains('connection')) {
+      return 'Connection error. Please check your internet connection.';
+    }
+    return error;
+  }
 }
