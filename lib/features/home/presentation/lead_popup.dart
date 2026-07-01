@@ -80,12 +80,12 @@ class _LeadPopupState extends State<LeadPopup>
     // Start repeating vibration alert
     _startVibrationAlert();
     
-    // Play loopable taxi request sound (Mixkit royalty-free SFX alert)
+    // Play loopable local lead sound
     try {
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-      await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav'));
+      await _audioPlayer.play(AssetSource('ringtone/crisp-fast-two-sec-1-1782943688959_ogLriGsj.wav'));
     } catch (_) {
-      // Fallback silently if offline or URL play fails
+      // Fallback silently if play fails
     }
   }
 

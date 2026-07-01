@@ -61,6 +61,8 @@ flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
   image_path: "assets/icons/app_icon.png"
+  adaptive_icon_background: "#064E3B"
+  adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"
   remove_alpha_ios: true
   
   min_sdk_android: 21
@@ -75,5 +77,6 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/lottie/
+    - assets/ringtone/
 
   generate: true
