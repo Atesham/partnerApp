@@ -7,6 +7,7 @@ import '../../../core/providers/order_provider.dart';
 import '../../../core/widgets/shared_widgets.dart';
 import '../../../core/services/supabase_storage_service.dart';
 import '../../../core/l10n/app_localizations.dart';
+import '../../main/presentation/main_screen.dart';
 
 class WeighingScreen extends StatefulWidget {
   final OrderModel order;
@@ -447,7 +448,6 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(),
-              // Animated success
               ScaleTransition(
                 scale: _scale,
                 child: Container(
@@ -477,17 +477,26 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
                 ),
-                child: Column(children: [
-                  Text('₹${widget.payout.toStringAsFixed(0)}',
-                    style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primary)),
-                  const SizedBox(height: 4),
-                  const Text('Added to your earnings', style: TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w600, fontSize: 14)),
-                ]),
+                child: Column(
+                  children: [
+                    Text('₹${widget.payout.toStringAsFixed(0)}',
+                      style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primary)),
+                    const SizedBox(height: 4),
+                    const Text('Added to your earnings', style: TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w600, fontSize: 14)),
+                  ],
+                ),
               ),
               const Spacer(),
               GradientButton(
                 label: 'Back to Home',
-                onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+                onPressed: () {
+                  // Pushing a new MainScreen and clearing the entire stack guarantees
+                  // we return to the home tab in a clean state, preventing any blank pages.
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const MainScreen()),
+                    (route) => false,
+                  );
+                },
                 icon: Icons.home_rounded,
               ),
             ],

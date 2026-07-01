@@ -58,6 +58,11 @@ class OrderModel {
   final String? partnerId;
   final String? partnerName;
   final List<ScrapItem> scrapItems;
+  /// Top-level category list sent by the customer app (e.g. ["Metal"]).
+  /// Used when scrapItems is empty (older/simple order format).
+  final List<String> rawScrapCategories;
+  /// Top-level estimated weight (kg) sent by the customer app.
+  final double rawEstimatedWeight;
   final List<String> imageUrls;
   final String? customerNotes;
   final String pickupSlot;
@@ -86,6 +91,8 @@ class OrderModel {
     this.partnerId,
     this.partnerName,
     required this.scrapItems,
+    this.rawScrapCategories = const [],
+    this.rawEstimatedWeight = 0.0,
     this.imageUrls = const [],
     this.customerNotes,
     required this.pickupSlot,
@@ -118,6 +125,10 @@ class OrderModel {
       scrapItems: (json['scrapItems'] as List<dynamic>? ?? [])
           .map((e) => ScrapItem.fromJson(e as Map<String, dynamic>))
           .toList(),
+      // Support flat scrapCategories array (used by simpler customer app orders)
+      rawScrapCategories: List<String>.from(json['scrapCategories'] ?? []),
+      // Support top-level estimatedWeight (used by simpler customer app orders)
+      rawEstimatedWeight: (json['estimatedWeight'] ?? 0.0).toDouble(),
       imageUrls: List<String>.from(json['imageUrls'] ?? []),
       customerNotes: json['customerNotes'],
       pickupSlot: json['pickupSlot'] ?? '',
@@ -135,7 +146,8 @@ class OrderModel {
       completedAt: (json['completedAt'] as Timestamp?)?.toDate(),
       expiresAt: (json['expiresAt'] as Timestamp?)?.toDate(),
       pickupOtp: json['otp']?.toString() ?? json['pickupOtp']?.toString() ?? '',
-      pickupType: json['pickupType'] ?? 'instant',
+      // Support both pickupType and orderType fields from different app versions
+      pickupType: json['pickupType'] ?? json['orderType'] ?? 'instant',
       reservedPartnerId: json['reservedPartnerId'],
     );
   }
@@ -151,6 +163,8 @@ class OrderModel {
         'partnerId': partnerId,
         'partnerName': partnerName,
         'scrapItems': scrapItems.map((e) => e.toJson()).toList(),
+        'scrapCategories': rawScrapCategories,
+        'estimatedWeight': rawEstimatedWeight,
         'imageUrls': imageUrls,
         'customerNotes': customerNotes,
         'pickupSlot': pickupSlot,
@@ -180,6 +194,8 @@ class OrderModel {
     String? partnerId,
     String? partnerName,
     List<ScrapItem>? scrapItems,
+    List<String>? rawScrapCategories,
+    double? rawEstimatedWeight,
     List<String>? imageUrls,
     String? customerNotes,
     String? pickupSlot,
@@ -208,6 +224,8 @@ class OrderModel {
       partnerId: partnerId ?? this.partnerId,
       partnerName: partnerName ?? this.partnerName,
       scrapItems: scrapItems ?? this.scrapItems,
+      rawScrapCategories: rawScrapCategories ?? this.rawScrapCategories,
+      rawEstimatedWeight: rawEstimatedWeight ?? this.rawEstimatedWeight,
       imageUrls: imageUrls ?? this.imageUrls,
       customerNotes: customerNotes ?? this.customerNotes,
       pickupSlot: pickupSlot ?? this.pickupSlot,
@@ -270,11 +288,23 @@ class OrderModel {
     }
   }
 
-  double get totalEstimatedWeight =>
-      scrapItems.fold(0, (sum, item) => sum + item.estimatedWeight);
+  /// Returns total estimated weight. Prefers scrapItems sum; falls back to
+  /// the flat estimatedWeight field sent by the customer app.
+  double get totalEstimatedWeight {
+    final fromItems = scrapItems.fold(0.0, (acc, item) => acc + item.estimatedWeight);
+    if (fromItems > 0) return fromItems;
+    return rawEstimatedWeight;
+  }
 
-  String get categoryList =>
-      scrapItems.map((e) => e.category).join(' · ');
+  /// Returns all scrap categories — from scrapItems or from rawScrapCategories.
+  List<String> get allScrapCategories {
+    if (scrapItems.isNotEmpty) {
+      return scrapItems.map((e) => e.category).toList();
+    }
+    return rawScrapCategories;
+  }
+
+  String get categoryList => allScrapCategories.join(' · ');
 
   String get statusDisplay {
     switch (status) {

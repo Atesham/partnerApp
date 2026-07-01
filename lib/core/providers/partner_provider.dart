@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/partner_model.dart';
 import '../services/location_tracking_service.dart';
 import '../services/notification_service.dart';
+import '../theme/app_theme.dart';
 
 class PartnerProvider extends ChangeNotifier {
   static final PartnerProvider _instance = PartnerProvider._internal();
@@ -278,23 +279,86 @@ class PartnerProvider extends ChangeNotifier {
   Future<void> refreshLocationAvailability() async {
     final prefs = await SharedPreferences.getInstance();
     final savedAllowed = prefs.getBool('location_allowed') ?? true;
-    _locationAllowed = savedAllowed && await _isGpsReady();
+    _locationAllowed = savedAllowed && await _checkGpsOnly();
     if (!_locationAllowed && _isOnline) {
       await toggleOnline(false);
     }
     notifyListeners();
   }
 
-  Future<bool> _isGpsReady() async {
+  Future<bool> _checkGpsOnly() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return false;
+
+    final permission = await Geolocator.checkPermission();
+    return permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse;
+  }
+
+  Future<bool> promptAndEnableGps(BuildContext context) async {
+    final hi = Localizations.localeOf(context).languageCode == 'hi';
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (context.mounted) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(hi ? 'स्थान (GPS) अक्षम है' : 'GPS is Disabled', style: const TextStyle(fontWeight: FontWeight.bold)),
+            content: Text(hi 
+              ? 'कृपया जारी रखने के लिए अपने डिवाइस का स्थान (GPS) सक्षम करें।' 
+              : 'Please enable device location (GPS) to go online and receive orders.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(hi ? 'रद्द करें' : 'Cancel', style: const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.bold)),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: Text(hi ? 'सेटिंग्स खोलें' : 'Open Settings', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+        if (proceed == true) {
+          await Geolocator.openLocationSettings();
+        }
+      }
+      return false;
+    }
 
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    return permission == LocationPermission.always ||
+    if (permission == LocationPermission.deniedForever) {
+      if (context.mounted) {
+        AppTheme.showSnack(
+          context,
+          hi 
+              ? 'स्थान अनुमति स्थायी रूप से अस्वीकार कर दी गई है। कृपया इसे सेटिंग्स में सक्षम करें।' 
+              : 'Location permission permanently denied. Please enable it in app settings.',
+          isError: true,
+        );
+        await Geolocator.openAppSettings();
+      }
+      return false;
+    }
+
+    final allowed = permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse;
+    
+    await setLocationAllowed(allowed);
+    return allowed;
+  }
+
+  Future<bool> _isGpsReady() async {
+    return _checkGpsOnly();
   }
 
   // -- Compliance Stack Direct Firestore Mutations --

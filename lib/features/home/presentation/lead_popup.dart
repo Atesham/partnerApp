@@ -1,14 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/order_model.dart';
 import '../../../core/models/partner_model.dart';
 import '../../../core/services/lead_service.dart';
-import '../../../core/widgets/shared_widgets.dart';
 import '../../../core/utils/location_utils.dart';
 import '../../orders/presentation/order_tracking_screen.dart';
+
 
 class LeadPopup extends StatefulWidget {
   final OrderModel order;
@@ -32,6 +34,8 @@ class _LeadPopupState extends State<LeadPopup>
   late Animation<double> _fadeAnim;
 
   late Timer _timer;
+  Timer? _vibrateTimer;
+  late final AudioPlayer _audioPlayer;
   int _secondsLeft = 120;
   bool _isAccepting = false;
   bool _responded = false;
@@ -46,6 +50,9 @@ class _LeadPopupState extends State<LeadPopup>
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
     _fadeAnim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
     _ctrl.forward();
+
+    _audioPlayer = AudioPlayer();
+    _startAlerts();
 
     final expires = widget.order.expiresAt;
     if (expires != null) {
@@ -67,6 +74,50 @@ class _LeadPopupState extends State<LeadPopup>
     });
 
     _listenToOrderStatus();
+  }
+
+  void _startAlerts() async {
+    // Start repeating vibration alert
+    _startVibrationAlert();
+    
+    // Play loopable taxi request sound (Mixkit royalty-free SFX alert)
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav'));
+    } catch (_) {
+      // Fallback silently if offline or URL play fails
+    }
+  }
+
+  /// Repeating vibration pattern — fires every 2.5 seconds until dismissed.
+  void _startVibrationAlert() {
+    _triggerVibration();
+    _vibrateTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+      if (!mounted || _responded) {
+        _vibrateTimer?.cancel();
+        return;
+      }
+      _triggerVibration();
+    });
+  }
+
+  void _triggerVibration() {
+    // Heavy impact followed by medium impact — mimics Rapido double-pulse
+    HapticFeedback.heavyImpact();
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) HapticFeedback.mediumImpact();
+    });
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) HapticFeedback.heavyImpact();
+    });
+  }
+
+  void _stopAlert() {
+    _vibrateTimer?.cancel();
+    _vibrateTimer = null;
+    try {
+      _audioPlayer.stop();
+    } catch (_) {}
   }
 
   void _listenToOrderStatus() {
@@ -96,6 +147,10 @@ class _LeadPopupState extends State<LeadPopup>
   void dispose() {
     _orderSub?.cancel();
     _timer.cancel();
+    _stopAlert();
+    try {
+      _audioPlayer.dispose();
+    } catch (_) {}
     _ctrl.dispose();
     super.dispose();
   }
@@ -104,6 +159,7 @@ class _LeadPopupState extends State<LeadPopup>
     if (_responded) return;
     _responded = true;
     _timer.cancel();
+    _stopAlert();
 
     setState(() => _isAccepting = true);
 
@@ -131,12 +187,14 @@ class _LeadPopupState extends State<LeadPopup>
     if (_responded) return;
     _responded = true;
     _timer.cancel();
+    _stopAlert();
     widget.onDeclined();
     Navigator.pop(context);
   }
 
   void _autoDecline() {
     _timer.cancel();
+    _stopAlert();
     widget.onDeclined();
     Navigator.pop(context);
   }
@@ -145,11 +203,11 @@ class _LeadPopupState extends State<LeadPopup>
 
   @override
   Widget build(BuildContext context) {
-    final scrapCategories = widget.order.scrapItems.map((e) => e.category).toList();
+    final scrapCategories = widget.order.allScrapCategories;
     return FadeTransition(
       opacity: _fadeAnim,
       child: Container(
-        color: Colors.black.withOpacity(0.5),
+        color: Colors.black.withValues(alpha: 0.5),
         alignment: Alignment.bottomCenter,
         child: SlideTransition(
           position: _slideAnim,
@@ -159,7 +217,7 @@ class _LeadPopupState extends State<LeadPopup>
               color: Colors.white,
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 40, offset: const Offset(0, -10)),
+                BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 40, offset: const Offset(0, -10)),
               ],
             ),
             child: Column(
@@ -372,7 +430,7 @@ class _LeadPopupState extends State<LeadPopup>
       children: [
         Container(
           width: 32, height: 32,
-          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
           child: Icon(icon, color: color, size: 16),
         ),
         const SizedBox(width: 12),
@@ -403,7 +461,7 @@ class _CountdownCircle extends StatelessWidget {
         children: [
           CircularProgressIndicator(
             value: progress,
-            backgroundColor: Colors.white.withOpacity(0.2),
+            backgroundColor: Colors.white.withValues(alpha: 0.2),
             valueColor: AlwaysStoppedAnimation(color),
             strokeWidth: 4,
           ),

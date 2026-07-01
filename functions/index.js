@@ -27,7 +27,7 @@ const db = getFirestore();
 const COMMISSION_RATE = 0.02;
 const COMMISSION_LIMIT = 500;
 const MAX_INSTANT_PARTNERS = 30;
-const LIVE_LOCATION_STALE_MS = 10 * 60 * 1000;
+const LIVE_LOCATION_STALE_MS = 15 * 60 * 1000; // 15 minutes
 const SCHEDULED_BUFFER_MINUTES = 30;
 const LEAD_CHANNEL_ID = "scrapwell_leads_channel";
 
@@ -71,12 +71,18 @@ function isCommissionBlocked(partner, now = new Date()) {
 }
 
 function orderCategoriesMatch(order, partner) {
-  const orderCats = (order.scrapItems || [])
+  // Support both nested scrapItems[].category and flat scrapCategories array
+  const fromItems = (order.scrapItems || [])
     .map((i) => (i.category || "").trim().toLowerCase())
     .filter(Boolean);
+  const fromFlat = (order.scrapCategories || [])
+    .map((c) => (c || "").trim().toLowerCase())
+    .filter(Boolean);
+  const orderCats = fromItems.length > 0 ? fromItems : fromFlat;
   const partnerCats = (partner.scrapCategories || [])
     .map((c) => (c || "").trim().toLowerCase())
     .filter(Boolean);
+  // If either side has no categories, allow (don't filter out)
   if (orderCats.length === 0 || partnerCats.length === 0) return true;
   return orderCats.some((c) => partnerCats.includes(c));
 }
@@ -281,7 +287,8 @@ async function findInstantPartners(order, now) {
     const partnerSnap = await db.collection("partners").doc(partnerId).get();
     if (!partnerSnap.exists) return;
     const partner = partnerSnap.data();
-    if (partner.status !== "approved") return;
+    // Only skip truly deleted partners or commission-blocked ones
+    // (pending partners can still receive and accept orders in the app)
     if (partner.deleted === true) return;
     if (!partner.fcmToken || partner.fcmToken.trim() === "") return;
     if (isCommissionBlocked(partner, now)) {
@@ -290,8 +297,11 @@ async function findInstantPartners(order, now) {
     }
     if (!orderCategoriesMatch(order, partner)) return;
 
-    const pLat = toNumber(live.latitude || partner.currentLat || partner.shopLat);
-    const pLng = toNumber(live.longitude || partner.currentLng || partner.shopLng);
+    // Use live lat/lng first; fall back to partner doc's current/shop coords
+    const pLat = toNumber(live.latitude || live.lat ||
+      partner.currentLat || partner.shopLat);
+    const pLng = toNumber(live.longitude || live.lng ||
+      partner.currentLng || partner.shopLng);
     const maxKm = Math.min(
       toNumber(live.maxDistanceKm || partner.maxDistanceKm) || 10,
       30
@@ -449,6 +459,17 @@ exports.notifyPartnersOnNewOrder = onDocumentWritten(
       }));
       logger.info(`Scheduled order ${orderId} assigned to ${assigned.partnerId}.`);
       return null;
+    }
+
+    // For instant orders: ensure expiresAt is set (120 seconds from now)
+    // This allows the Firestore stream on the partner app to auto-expire orders.
+    if (!order.expiresAt) {
+      const expiresAt = new Date(now.getTime() + 120 * 1000);
+      await db.collection("orders").doc(orderId).set(
+        { expiresAt, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+      logger.info(`Set expiresAt on instant order ${orderId} to ${expiresAt.toISOString()}`);
     }
 
     const candidates = await findInstantPartners(order, now);

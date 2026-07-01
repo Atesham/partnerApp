@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/order_model.dart';
 import '../models/partner_model.dart';
+import '../providers/partner_provider.dart';
 import '../utils/location_utils.dart';
 import '../services/location_tracking_service.dart';
 
@@ -27,7 +28,7 @@ class LeadService {
   /// Stream of instant pickup orders that this partner is eligible to see.
   ///
   /// Flow:
-  ///   1. Listen to orders with status='searchingPartner' + pickupType='instant'
+  ///   1. Listen to orders with status='searchingPartner'
   ///   2. Filter client-side by partner's live location + radius
   ///   3. ALL eligible partners receive the same stream simultaneously
   ///   4. First-accept wins via atomic Firestore transaction
@@ -36,35 +37,60 @@ class LeadService {
     if (uid == null) return const Stream.empty();
     if (partner.shouldBlockForCommission) return Stream.value(const []);
 
-    final partnerLat = partner.currentLat != 0.0 ? partner.currentLat : partner.shopLat;
-    final partnerLng = partner.currentLng != 0.0 ? partner.currentLng : partner.shopLng;
-
     // Effective radius: the smaller of partner's preference and the hard cap
     final effectiveRadius = partner.maxDistanceKm.clamp(1.0, kInstantPickupMaxRadiusKm);
 
     return _db
         .collection('orders')
         .where('status', isEqualTo: 'searchingPartner')
-        .where('pickupType', isEqualTo: 'instant')
         .snapshots()
         .map((snap) {
       final now = DateTime.now();
+
+      // Re-read partner's current location on EVERY stream event so that if
+      // GPS wasn't ready at stream creation, we self-correct as location updates.
+      final freshPartner = PartnerProvider().partner;
+      final partnerLat = freshPartner.currentLat != 0.0
+          ? freshPartner.currentLat
+          : freshPartner.shopLat;
+      final partnerLng = freshPartner.currentLng != 0.0
+          ? freshPartner.currentLng
+          : freshPartner.shopLng;
+      final locationKnown = partnerLat != 0.0 || partnerLng != 0.0;
+
       return snap.docs
-          .map((d) => OrderModel.fromJson(d.data()))
+          .map((d) => OrderModel.fromJson({...d.data(), 'orderId': d.id.isNotEmpty ? (d.data()['orderId'] ?? d.id) : d.id}))
           .where((order) {
-            // Exclude expired orders (allowing a 5-minute buffer for client-server clock skew)
-            if (order.expiresAt != null && now.isAfter(order.expiresAt!.add(const Duration(minutes: 5)))) {
+            // Filter: must be instant pickup (supports both field names:
+            // pickupType='instant' used by newer orders, orderType='instant'
+            // or isInstantPickup=true used by older customer app versions)
+            final type = order.pickupType.toLowerCase();
+            final isInstant = type == 'instant' || type == 'insta-pickup';
+            if (!isInstant) return false;
+
+            // Exclude expired orders (with a 5-minute buffer for clock skew)
+            if (order.expiresAt != null &&
+                now.isAfter(order.expiresAt!.add(const Duration(minutes: 5)))) {
               return false;
             }
-            // Scrap Category Filter — partner must accept at least one of the order's categories
-            final dealsInOrderScrap = order.scrapItems.isEmpty ||
-                order.scrapItems.any((item) {
-                  final orderCat = item.category.trim().toLowerCase();
-                  return partner.scrapCategories.any((pCat) => pCat.trim().toLowerCase() == orderCat);
+
+            // Scrap Category Filter — partner must accept at least one category
+            // Supports both flat scrapCategories field and nested scrapItems[].category
+            final orderCategories = order.allScrapCategories;
+            final dealsInOrderScrap = orderCategories.isEmpty ||
+                partner.scrapCategories.isEmpty ||
+                orderCategories.any((orderCat) {
+                  final normalizedOrderCat = orderCat.trim().toLowerCase();
+                  return partner.scrapCategories.any(
+                    (pCat) => pCat.trim().toLowerCase() == normalizedOrderCat,
+                  );
                 });
             if (!dealsInOrderScrap) return false;
 
-            // Radius filter — Haversine distance from partner's live location
+            // Radius filter — skip if partner location is not yet known (GPS starting up)
+            // so orders still appear in feed immediately after going online.
+            if (!locationKnown) return true;
+
             final dist = LocationUtils.calculateDistance(
               partnerLat,
               partnerLng,
@@ -74,8 +100,8 @@ class LeadService {
             return dist <= effectiveRadius;
           })
           .toList()
-        // Sort nearest-first so the feed is always ordered by distance
         ..sort((a, b) {
+          if (!locationKnown) return 0;
           final da = LocationUtils.calculateDistance(
               partnerLat, partnerLng, a.customerLat, a.customerLng);
           final db = LocationUtils.calculateDistance(
@@ -142,16 +168,17 @@ class LeadService {
 
         // ── 3. Verify partner is in live_locations (online + available) ────
         final liveLocSnap = await tx.get(liveLocRef);
-        if (!liveLocSnap.exists) {
-          throw Exception('Partner not found in live_locations');
+        if (liveLocSnap.exists) {
+          final liveData = liveLocSnap.data()!;
+          if (liveData['isOnline'] != true) {
+            throw Exception('Partner is offline');
+          }
+          if (liveData['isAvailable'] != true) {
+            throw Exception('Partner is currently on another order');
+          }
         }
-        final liveData = liveLocSnap.data()!;
-        if (liveData['isOnline'] != true) {
-          throw Exception('Partner is offline');
-        }
-        if (liveData['isAvailable'] != true) {
-          throw Exception('Partner is currently on another order');
-        }
+        // If live_locations doc doesn't exist yet (partner just came online),
+        // we allow the accept and create it as part of the transaction below.
 
         // ── 4. Atomic assignment ───────────────────────────────────────────
         // Update order
@@ -477,11 +504,13 @@ class LeadService {
     // Must be within partner's chosen coverage radius
     if (dist > partner.maxDistanceKm) return null;
 
-    // Scrap Category Filter — partner must accept at least one of the order's categories
-    final dealsInOrderScrap = order.scrapItems.isEmpty ||
-        order.scrapItems.any((item) {
-          final orderCat = item.category.trim().toLowerCase();
-          return partner.scrapCategories.any((pCat) => pCat.trim().toLowerCase() == orderCat);
+    // Scrap Category Filter — partner must accept at least one of the order's categories.
+    // Supports both flat scrapCategories field and nested scrapItems[].category.
+    final orderCategories = order.allScrapCategories;
+    final dealsInOrderScrap = orderCategories.isEmpty ||
+        orderCategories.any((orderCat) {
+          final normalized = orderCat.trim().toLowerCase();
+          return partner.scrapCategories.any((pCat) => pCat.trim().toLowerCase() == normalized);
         });
     if (!dealsInOrderScrap) return null;
 

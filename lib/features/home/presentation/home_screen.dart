@@ -42,11 +42,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _earnings.loadEarnings();
     _earnings.listenToWallet();
     _partner.refreshLocationAvailability();
+    
+    // Register standard ChangeNotifier listeners. Direct listeners are much more robust 
+    // than top-level ListenableBuilders for complex scroll view structures.
     _partner.addListener(_handlePartnerChange);
+    _earnings.addListener(_onProviderUpdate);
+    _orders.addListener(_onProviderUpdate);
+    
     _listenToLeads();
 
     // Start scheduled order auto-assign listener once partner data is ready.
-    // This is safe to call immediately — it filters by approved status internally.
     _orders.listenForScheduledOrders();
   }
 
@@ -54,6 +59,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _partner.removeListener(_handlePartnerChange);
+    _earnings.removeListener(_onProviderUpdate);
+    _orders.removeListener(_onProviderUpdate);
     _leadsSub?.cancel();
     super.dispose();
   }
@@ -62,6 +69,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _partner.refreshLocationAvailability();
+    }
+  }
+
+  void _onProviderUpdate() {
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -74,10 +87,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } else {
       _leadsSub?.cancel();
       _leadsSub = null;
-      setState(() {
-        _nearbyOrders = [];
-        _isLeadsLoading = false;
-      });
+      _nearbyOrders = [];
+      _isLeadsLoading = false;
+    }
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -223,19 +237,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-      // ✅ FIX: ONE top-level ListenableBuilder that listens to BOTH
-      // _partner AND _earnings. Any Firestore update to rating/name/status
-      // will now trigger a full rebuild of the screen.
-      body: ListenableBuilder(
-        listenable: Listenable.merge([_partner, _earnings, _orders]),
-        builder: (context, _) {
-          return CustomScrollView(
-            slivers: [
-              _buildAppBar(context),
-              SliverToBoxAdapter(child: _buildBody(context)),
-            ],
-          );
-        },
+      body: CustomScrollView(
+        slivers: [
+          _buildAppBar(context),
+          SliverToBoxAdapter(child: _buildBody(context)),
+        ],
       ),
     );
   }
@@ -339,12 +345,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           const SizedBox(height: 4),
 
-          if (_earnings.hasCommissionDue) _buildCommissionDueCard(),
+          if (_shouldShowCommissionDueCard()) _buildCommissionDueCard(),
 
           if (!_partner.locationAllowed)
             Container(
               margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.red[50],
                 borderRadius: BorderRadius.circular(12),
@@ -360,15 +366,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      Localizations.localeOf(context).languageCode == 'hi'
-                          ? 'स्थान पहुंच (GPS) अक्षम है। ऑनलाइन जाने के लिए इसे गोपनीयता सेटिंग्स में चालू करें।'
-                          : 'Location Access (GPS) is disabled. Turn it on in Privacy Settings to receive requests.',
+                      context.t('locationDisabledDescription'),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppTheme.error,
                         fontWeight: FontWeight.w600,
                         height: 1.4,
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: () => _partner.promptAndEnableGps(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.error,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: Text(
+                      context.t('enableLocationButton'),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -378,22 +399,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           OnlineToggleCard(
             isOnline: _partner.isOnline,
             onToggle: (v) async {
-              if (v && !_partner.locationAllowed) {
-                AppTheme.showSnack(
-                  context,
-                  Localizations.localeOf(context).languageCode == 'hi'
-                      ? 'स्थान पहुंच बंद है। इसे गोपनीयता केंद्र में चालू करें।'
-                      : 'Location access is disabled. Enable it in Privacy & Data to go online.',
-                  isError: true,
-                );
-                return;
+              if (v) {
+                // Directly trigger permissions popup/GPS prompt
+                final allowed = await _partner.promptAndEnableGps(context);
+                if (!allowed) return;
               }
               if (v && _partner.isCommissionBlocked) {
-                AppTheme.showSnack(
-                  context,
-                  'Pay pending Scrapwell commission to receive more orders.',
-                  isError: true,
-                );
+                if (mounted) {
+                  AppTheme.showSnack(
+                    context,
+                    Localizations.localeOf(context).languageCode == 'hi'
+                        ? 'अधिक ऑर्डर प्राप्त करने के लिए स्क्रैपवेल कमीशन का भुगतान करें।'
+                        : 'Pay pending Scrapwell commission to receive more orders.',
+                    isError: true,
+                  );
+                }
                 return;
               }
               await _partner.toggleOnline(v);
@@ -519,18 +539,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  bool _shouldShowCommissionDueCard() {
+    final balance = _earnings.commissionDueBalance;
+    if (balance <= 0.01) return false;
+
+    // DateTime.tuesday is 2 (Monday=1, Tuesday=2 ... Sunday=7)
+    final isTuesday = DateTime.now().weekday == DateTime.tuesday;
+
+    if (balance >= 500 || isTuesday) {
+      return true;
+    }
+    return false;
+  }
+
   Widget _buildCommissionDueCard() {
     final dueAt = _earnings.commissionDueAt;
     final dueText = dueAt == null
-        ? 'Due every Tuesday'
-        : 'Due by ${dueAt.day}/${dueAt.month}/${dueAt.year}';
+        ? context.t('everyTuesday')
+        : 'due by ${dueAt.day}/${dueAt.month}/${dueAt.year}';
     final blocked = _partner.isCommissionBlocked ||
         _earnings.shouldBlockForCommission;
+
+    final balanceText = _earnings.commissionDueBalance.toStringAsFixed(0);
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: blocked ? const Color(0xFFFEF2F2) : const Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(16),
@@ -540,64 +575,79 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               : AppTheme.warning.withOpacity(0.35),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            blocked
-                ? Icons.lock_clock_rounded
-                : Icons.account_balance_wallet_rounded,
-            color: blocked ? AppTheme.error : AppTheme.warning,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  blocked ? 'Commission payment required' : 'Commission due',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: blocked ? AppTheme.error : AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Pay Rs ${_earnings.commissionDueBalance.toStringAsFixed(0)} to Scrapwell. $dueText.',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Column(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ElevatedButton(
-                onPressed: _payCommission,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'Pay',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+              Icon(
+                blocked
+                    ? Icons.lock_clock_rounded
+                    : Icons.account_balance_wallet_rounded,
+                color: blocked ? AppTheme.error : AppTheme.warning,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      blocked 
+                          ? context.t('commissionPaymentRequired') 
+                          : context.t('commissionDueTitle'),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: blocked ? AppTheme.error : AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      context.t('payCommissionToReceive')
+                          .replaceAll('{amount}', balanceText)
+                          .replaceAll('{dueText}', dueText),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              TextButton(
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
                 onPressed: _confirmCommissionOnWhatsApp,
-                child: const Text(
-                  'I paid',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                icon: const Icon(Icons.chat_rounded, size: 16, color: AppTheme.primary),
+                label: Text(
+                  context.t('iPaidButton'),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppTheme.primary),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: _payCommission,
+                icon: const Icon(Icons.payment_rounded, size: 16, color: Colors.white),
+                label: Text(
+                  context.t('payButton'),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  minimumSize: const Size(0, 40),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
@@ -620,9 +670,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'How orders are assigned',
-            style: TextStyle(
+          Text(
+            context.t('howOrdersAssigned'),
+            style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w800,
               color: AppTheme.textPrimary,
@@ -631,15 +681,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const SizedBox(height: 10),
           _assignmentRuleRow(
             Icons.flash_on_rounded,
-            'Instant pickups',
-            'Online + GPS on. Shown by your live location, radius, availability, and scrap category.',
+            context.t('instantPickupsTitle'),
+            context.t('instantPickupsDesc'),
             AppTheme.primary,
           ),
           const SizedBox(height: 10),
           _assignmentRuleRow(
             Icons.calendar_month_rounded,
-            'Scheduled pickups',
-            'Can be reserved by working hours and slot availability. GPS online is not required to start a reserved booking.',
+            context.t('scheduledPickupsTitle'),
+            context.t('scheduledPickupsDesc'),
             AppTheme.warning,
           ),
         ],

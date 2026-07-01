@@ -46,6 +46,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_image_compress: ^2.4.0
   crypto: ^3.0.7
+  audioplayers: ^6.0.0
 
 dependency_overrides:
   vector_math: ^2.3.0

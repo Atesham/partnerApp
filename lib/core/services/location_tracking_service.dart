@@ -38,10 +38,26 @@ class LocationTrackingService {
     if (!hasPermission) return;
 
     _isTracking = true;
-    _setupTrackingStream();
 
     // Mark live_locations as online immediately (before first GPS tick)
     await _markLiveAvailability(isOnline: true, isAvailable: true);
+
+    // ── CRITICAL: Get current position RIGHT NOW so live_locations has a valid
+    // lat/lng immediately. Without this, orders created in the next 2 minutes
+    // would not be routed to this partner because pLat/pLng === 0.
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      await _uploadLocation(position);
+    } catch (_) {
+      // If getCurrentPosition fails (e.g. cold GPS fix), the stream will
+      // still pick up the position within the first interval tick.
+    }
+
+    _setupTrackingStream();
 
     // Listen to order status changes to dynamically adjust tracking interval
     OrderProvider().addListener(_onOrderStatusChanged);
@@ -68,10 +84,10 @@ class LocationTrackingService {
     _positionSub?.cancel();
 
     final hasActiveOrder = OrderProvider().hasActiveOrder;
-    const distanceFilter = 50; // 50 meters minimum moved for instant pickup accuracy
+    const distanceFilter = 20; // 20 meters minimum moved for high accuracy
     final interval = hasActiveOrder
-        ? const Duration(seconds: 30) // faster when on an active order
-        : const Duration(minutes: 2);
+        ? const Duration(seconds: 10)  // fast updates when on active order
+        : const Duration(seconds: 30); // 30s idle — fast enough for instant pickup
 
     final androidSettings = AndroidSettings(
       accuracy: LocationAccuracy.high,

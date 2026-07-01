@@ -100,8 +100,8 @@ class _OnlineToggleCardState extends State<OnlineToggleCard> {
                         const SizedBox(height: 4),
                         Text(
                           widget.isOnline
-                              ? 'Instant pickups are active with live GPS.'
-                              : 'Go online only when GPS is on for instant pickups.',
+                              ? context.t('instantActiveGps')
+                              : context.t('goOnlineGpsOn'),
                           style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 13, fontWeight: FontWeight.w500)),
                       ],
                     ),

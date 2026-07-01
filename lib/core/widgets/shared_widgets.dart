@@ -161,7 +161,8 @@ class PulsingDot extends StatefulWidget {
 class _PulsingDotState extends State<PulsingDot>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _animation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
 
   @override
   void initState() {
@@ -171,7 +172,10 @@ class _PulsingDotState extends State<PulsingDot>
       duration: const Duration(seconds: 1),
     )..repeat(reverse: true);
 
-    _animation = Tween<double>(begin: 0.5, end: 1.0).animate(
+    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _opacityAnimation = Tween<double>(begin: 0.6, end: 0.15).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
   }
@@ -184,31 +188,39 @@ class _PulsingDotState extends State<PulsingDot>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: widget.size * 2.2 * _animation.value,
-              height: widget.size * 2.2 * _animation.value,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: widget.color.withOpacity(0.3 * _animation.value),
+    final maxSize = widget.size * 2.2;
+    return SizedBox(
+      width: maxSize,
+      height: maxSize,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Using ScaleTransition and FadeTransition ensures animations run 
+          // entirely in paint/rendering phase and never trigger layout recalculations.
+          ScaleTransition(
+            scale: _scaleAnimation,
+            child: FadeTransition(
+              opacity: _opacityAnimation,
+              child: Container(
+                width: maxSize,
+                height: maxSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: widget.color,
+                ),
               ),
             ),
-            Container(
-              width: widget.size,
-              height: widget.size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: widget.color,
-              ),
+          ),
+          Container(
+            width: widget.size,
+            height: widget.size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: widget.color,
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 }

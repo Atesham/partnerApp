@@ -367,5 +367,22 @@ const Map<String, String> stringsHi = {
   'noUpiApp': 'कोई UPI ऐप नहीं मिला। {upiId} पर भुगतान करें।',
   'unableWhatsapp': 'WhatsApp खोलने में असमर्थ।',
   'upiPaymentNote': 'भुगतान आपके UPI ऐप में खुलेगा। स्क्रैपवेल द्वारा सत्यापन के बाद बकाया शेष साफ़ किया जाएगा।',
+  
+  // Home Screen Assignment Card & Alerts
+  'howOrdersAssigned': 'ऑर्डर कैसे सौंपे जाते हैं',
+  'instantPickupsTitle': 'त्वरित पिकअप (Instant)',
+  'instantPickupsDesc': 'ऑनलाइन + जीपीएस चालू। आपके लाइव स्थान, त्रिज्या, उपलब्धता और स्क्रैप श्रेणी द्वारा फिल्टर किए जाते हैं।',
+  'scheduledPickupsTitle': 'अनुसूचित पिकअप (Scheduled)',
+  'scheduledPickupsDesc': 'कार्य समय और स्लॉट उपलब्धता द्वारा आरक्षित किए जा सकते हैं। आरक्षित बुकिंग शुरू करने के लिए जीपीएस ऑनलाइन होना आवश्यक नहीं है।',
+  'commissionPaymentRequired': 'कमीशन भुगतान आवश्यक है',
+  'commissionDueTitle': 'कमीशन देय है',
+  'payCommissionToReceive': 'आगे के ऑर्डर प्राप्त करने के लिए स्क्रैपवेल को ₹{amount} कमीशन का भुगतान करें। {dueText}।',
+  'payButton': 'भुगतान करें',
+  'iPaidButton': 'मैंने भुगतान कर दिया',
+  'locationAccessRequired': 'स्थान अनुमति आवश्यक है',
+  'locationDisabledDescription': 'स्थान पहुंच (GPS) अक्षम है। ऑर्डर प्राप्त करने के लिए कृपया स्थान सक्षम करें।',
+  'enableLocationButton': 'स्थान सक्षम करें',
+  'instantActiveGps': 'लाइव जीपीएस के साथ त्वरित पिकअप सक्रिय हैं।',
+  'goOnlineGpsOn': 'त्वरित पिकअप के लिए जीपीएस चालू होने पर ही ऑनलाइन जाएं।',
 };
 

@@ -366,5 +366,22 @@ const Map<String, String> stringsEn = {
   'noUpiApp': 'No UPI app found. Pay to {upiId}.',
   'unableWhatsapp': 'Unable to open WhatsApp.',
   'upiPaymentNote': 'Payment opens in your UPI app. Due balance is cleared after Scrapwell verifies the transfer.',
+  
+  // Home Screen Assignment Card & Alerts
+  'howOrdersAssigned': 'How orders are assigned',
+  'instantPickupsTitle': 'Instant Pickups',
+  'instantPickupsDesc': 'Online + GPS on. Filtered by your live location, radius, availability, and scrap category.',
+  'scheduledPickupsTitle': 'Scheduled Pickups',
+  'scheduledPickupsDesc': 'Can be reserved by working hours and slot availability. GPS online is not required to start a reserved booking.',
+  'commissionPaymentRequired': 'Commission Payment Required',
+  'commissionDueTitle': 'Commission Due',
+  'payCommissionToReceive': 'Pay Rs {amount} commission to Scrapwell. {dueText}.',
+  'payButton': 'Pay Now',
+  'iPaidButton': 'I Paid',
+  'locationAccessRequired': 'Location Access Required',
+  'locationDisabledDescription': 'Location Access (GPS) is disabled. Please enable device location to receive orders.',
+  'enableLocationButton': 'Enable Location',
+  'instantActiveGps': 'Instant pickups are active with live GPS.',
+  'goOnlineGpsOn': 'Go online only when GPS is on for instant pickups.',
 };
 
