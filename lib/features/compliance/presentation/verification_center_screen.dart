@@ -1064,7 +1064,7 @@ class _VerificationCenterScreenState extends State<VerificationCenterScreen> {
           },
         );
       },
-    );
+    ).whenComplete(() => aadhaarCtrl.dispose());
   }
 
   Widget _buildDocUploadCard({required String label, required File? file}) {
@@ -1293,7 +1293,10 @@ class _VerificationCenterScreenState extends State<VerificationCenterScreen> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      shopNameCtrl.dispose();
+      gstCtrl.dispose();
+    });
   }
 
   void _verifyBankDialog(BuildContext context, PartnerModel p, bool isHindi) {
@@ -1532,7 +1535,12 @@ class _VerificationCenterScreenState extends State<VerificationCenterScreen> {
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      holderCtrl.dispose();
+      accountCtrl.dispose();
+      ifscCtrl.dispose();
+      upiCtrl.dispose();
+    });
   }
 
   Future<void> _verifyLocation(

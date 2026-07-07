@@ -10,6 +10,7 @@ import '../../firebase_options.dart';
 import '../models/order_model.dart';
 import '../models/partner_model.dart';
 import 'lead_service.dart';
+import '../utils/log_utils.dart';
 
 // Top level background message handler required by FCM.
 // Must be annotated with @pragma('vm:entry-point') to prevent tree shaking.
@@ -20,7 +21,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  debugPrint('Background FCM message: ${message.messageId} | type=${message.data['type']}');
+  debugLog('Background FCM message: ${message.messageId} | type=${message.data['type']}');
   // Show local heads-up notification for data-only messages
   // (FCM notification messages are auto-displayed by the system when the app is killed.)
   if (message.notification == null && message.data.isNotEmpty) {
@@ -107,20 +108,20 @@ class NotificationService {
 
       // Handle message when app is in foreground
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        debugPrint('Got a message in the foreground: ${message.messageId}');
+        debugLog('Got a message in the foreground: ${message.messageId}');
         showLocalNotification(message);
       });
 
       // Handle message when app was in background and user tapped the notification
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        debugPrint('User tapped background notification: ${message.messageId}');
+        debugLog('User tapped background notification: ${message.messageId}');
         _handleNotificationClick(message.data);
       });
 
       // Check if the app was opened from a completely terminated state via a notification
       final initialMessage = await _fcm.getInitialMessage();
       if (initialMessage != null) {
-        debugPrint('App opened from terminated state via notification: ${initialMessage.messageId}');
+        debugLog('App opened from terminated state via notification: ${initialMessage.messageId}');
         // Wait a bit to ensure the navigator is fully ready
         Future.delayed(const Duration(milliseconds: 1500), () {
           _handleNotificationClick(initialMessage.data);
@@ -134,9 +135,9 @@ class NotificationService {
       });
 
       _initialized = true;
-      debugPrint('NotificationService initialized successfully.');
+      debugLog('NotificationService initialized successfully.');
     } catch (e) {
-      debugPrint('Error initializing NotificationService: $e');
+      debugLog('Error initializing NotificationService: $e');
     }
   }
 
@@ -178,13 +179,13 @@ class NotificationService {
 
       _knownOrderIds = currentIds;
     }, onError: (err) {
-      debugPrint('Error in NotificationService local lead stream: $err');
+      debugLog('Error in NotificationService local lead stream: $err');
     });
     
     // ── Start scheduled order alert listener ──────────────────────────────
     _startScheduledOrderAlertListener(partner.uid);
 
-    debugPrint('Local lead stream listener started for partner ${partner.uid}');
+    debugLog('Local lead stream listener started for partner ${partner.uid}');
   }
 
   /// Watches Firestore for scheduled orders newly assigned to this partner.
@@ -217,13 +218,13 @@ class NotificationService {
 
         _alertedScheduledIds.add(orderId);
         _showScheduledOrderNotification(order);
-        debugPrint('Scheduled order alert fired for orderId=$orderId');
+        debugLog('Scheduled order alert fired for orderId=$orderId');
       }
     }, onError: (err) {
-      debugPrint('Error in scheduled order alert listener: $err');
+      debugLog('Error in scheduled order alert listener: $err');
     });
 
-    debugPrint('Scheduled order alert listener started for partner $partnerUid');
+    debugLog('Scheduled order alert listener started for partner $partnerUid');
   }
 
   /// Stop listening to the nearby leads stream
@@ -234,7 +235,7 @@ class NotificationService {
     _scheduledAlertSub?.cancel();
     _scheduledAlertSub = null;
     _alertedScheduledIds.clear();
-    debugPrint('Local lead stream listener stopped.');
+    debugLog('Local lead stream listener stopped.');
   }
 
   /// Request runtime permissions for notifications (Android 13+ and iOS)
@@ -248,7 +249,7 @@ class NotificationService {
         provisional: false,
       );
       
-      debugPrint('User notification permission status: ${settings.authorizationStatus}');
+      debugLog('User notification permission status: ${settings.authorizationStatus}');
 
       // For Android 13+, request explicit local notification permission if needed
       final androidPlugin = _localNotifications.resolvePlatformSpecificImplementation<
@@ -257,7 +258,7 @@ class NotificationService {
         await androidPlugin.requestNotificationsPermission();
       }
     } catch (e) {
-      debugPrint('Error requesting notification permissions: $e');
+      debugLog('Error requesting notification permissions: $e');
     }
   }
 
@@ -272,7 +273,7 @@ class NotificationService {
         await _saveTokenToFirestore(token);
       }
     } catch (e) {
-      debugPrint('Error getting FCM token: $e');
+      debugLog('Error getting FCM token: $e');
     }
   }
 
@@ -286,7 +287,7 @@ class NotificationService {
         'fcmToken': token,
         'lastSeen': FieldValue.serverTimestamp(),
       });
-      debugPrint('FCM Token successfully saved to Firestore: $token');
+      debugLog('FCM Token successfully saved to Firestore: $token');
     } catch (e) {
       // Fallback to merge set if update fails (e.g. document does not exist yet)
       try {
@@ -294,9 +295,9 @@ class NotificationService {
           'fcmToken': token,
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        debugPrint('FCM Token merged to Firestore.');
+        debugLog('FCM Token merged to Firestore.');
       } catch (err) {
-        debugPrint('Failed to save FCM token to Firestore: $err');
+        debugLog('Failed to save FCM token to Firestore: $err');
       }
     }
   }
@@ -342,7 +343,7 @@ class NotificationService {
         payload: order.orderId,
       );
     } catch (e) {
-      debugPrint('Error showing local lead notification: $e');
+      debugLog('Error showing local lead notification: $e');
     }
   }
 
@@ -388,7 +389,7 @@ class NotificationService {
         payload: order.orderId,
       );
     } catch (e) {
-      debugPrint('Error showing scheduled order notification: $e');
+      debugLog('Error showing scheduled order notification: $e');
     }
   }
 
@@ -439,7 +440,7 @@ class NotificationService {
         payload: message.data['click_action'] ?? message.data['orderId'] ?? '',
       );
     } catch (e) {
-      debugPrint('Error showing local notification: $e');
+      debugLog('Error showing local notification: $e');
     }
   }
 
@@ -454,7 +455,7 @@ class NotificationService {
   /// Navigate or change tab depending on the payload action
   void _handleNotificationClick(Map<String, dynamic> data) {
     if (_navigatorKey == null || _navigatorKey!.currentState == null) {
-      debugPrint('Navigator state is not ready — queuing navigation.');
+      debugLog('Navigator state is not ready — queuing navigation.');
       // Retry after a short delay to allow the navigator to mount
       Future.delayed(const Duration(milliseconds: 800), () {
         _handleNotificationClick(data);
@@ -466,7 +467,7 @@ class NotificationService {
     final String? orderId = data['orderId'];
 
     if (type == 'new_order' || (orderId != null && orderId.isNotEmpty)) {
-      debugPrint('FCM tap → navigating to Home tab (orderId=$orderId)');
+      debugLog('FCM tap → navigating to Home tab (orderId=$orderId)');
       // Pop all routes back to root (SplashScreen) which will redirect to MainScreen,
       // then the HomeScreen's lead stream will auto-show the popup for that order.
       _navigatorKey!.currentState?.pushNamedAndRemoveUntil(

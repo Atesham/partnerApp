@@ -239,6 +239,7 @@ const Map<String, String> stringsEn = {
   'otherCategory': 'Other',
   'enterOtherCategory': 'Enter Custom Category',
   'errorNoAadhaar': 'Please enter a valid 12-digit Aadhaar number',
+  'errorInvalidAadhaar': 'Invalid Aadhaar number. Please check and re-enter.',
   'errorNoAadhaarFront': 'Please select Aadhaar Front image',
   'errorNoAadhaarBack': 'Please select Aadhaar Back image',
   'errorNoExactAddress': 'Please enter your exact shop address',
@@ -432,5 +433,18 @@ const Map<String, String> stringsEn = {
   'orderCancelledSuccess': 'Order cancelled successfully.',
   'cannotCancelAfterPickup': 'This order cannot be cancelled after pickup has started.',
   'failedToCancelOrder': 'Failed to cancel order.',
+
+  // Commission Blocked Dialog
+  'ordersPaused': 'Orders are paused',
+  'clearCommissionInstructions': 'Clear pending commission of Rs {amount} to receive further orders.',
+  'payCommission': 'Pay Commission',
+  'iPaidNotify': 'I paid, notify Scrapwell',
+
+  // Lead Details & Tip
+  'locationLabel': 'Location',
+  'distanceLabel': 'Distance',
+  'payoutToCustomer': 'Payout to Customer',
+  'extraTipForYou': 'Extra Tip for You',
+  'pickupSlotLabel': 'Pickup Slot',
 };
 

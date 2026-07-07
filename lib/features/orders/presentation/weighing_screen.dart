@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/log_utils.dart';
 import '../../../core/models/order_model.dart';
 import '../../../core/providers/order_provider.dart';
 import '../../../core/widgets/shared_widgets.dart';
@@ -77,7 +78,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Error picking image: $e');
+      debugLog('Error picking image: $e');
     }
   }
 
@@ -99,7 +100,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
     try {
       photoUrl = await SupabaseStorageService.uploadImage(_weighingPhoto!);
     } catch (e) {
-      debugPrint('Supabase upload failed: $e');
+      debugLog('Supabase upload failed: $e');
     }
 
     final items = widget.order.scrapItems.asMap().entries.map((entry) {

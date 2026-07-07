@@ -20,6 +20,7 @@ class PartnerProvider extends ChangeNotifier {
   bool _isOnline = false;
   String? _error;
   StreamSubscription<DocumentSnapshot>? _partnerSub;
+  DateTime? _lastPartnerCacheWriteTime;
 
   // Track location permission override in state
   bool _locationAllowed = true;
@@ -86,16 +87,22 @@ class PartnerProvider extends ChangeNotifier {
     _partnerSub?.cancel();
     _partnerSub = _db.collection('partners').doc(uid).snapshots().listen((doc) async {
       if (doc.exists && doc.data() != null) {
-        _partner = PartnerModel.fromJson(doc.data()!);
+        final newPartner = PartnerModel.fromJson(doc.data()!);
+        final isOnlineChanged = _isOnline != newPartner.isOnline;
+        _partner = newPartner;
         _isOnline = _partner.isOnline;
         
-        // Cache the fresh profile updates
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('cached_partner_$uid', CacheUtils.encode(doc.data()!));
-        } catch (_) {}
-        
         final prefs = await SharedPreferences.getInstance();
+        
+        // Cache the fresh profile updates (throttled to max once per 30 seconds or on online status changes)
+        final now = DateTime.now();
+        if (_lastPartnerCacheWriteTime == null ||
+            isOnlineChanged ||
+            now.difference(_lastPartnerCacheWriteTime!) > const Duration(seconds: 30)) {
+          _lastPartnerCacheWriteTime = now;
+          await prefs.setString('cached_partner_$uid', CacheUtils.encode(doc.data()!));
+        }
+        
         final savedAllowed = prefs.getBool('location_allowed') ?? true;
         _locationAllowed = savedAllowed && await _isGpsReady();
         

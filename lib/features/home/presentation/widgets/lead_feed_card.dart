@@ -165,6 +165,24 @@ class _LeadFeedCardState extends State<LeadFeedCard>
                                 color: AppTheme.textSecondary,
                               ),
                             ),
+                            if (widget.order.tipAmount > 0) ...[
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD1FAE5),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '+₹${widget.order.tipAmount.toStringAsFixed(0)} Tip',
+                                  style: const TextStyle(
+                                    color: Color(0xFF047857),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ],
@@ -361,14 +379,38 @@ class _LeadFeedCardState extends State<LeadFeedCard>
               ),
             ),
             const Spacer(),
+            if (widget.order.tipAmount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981), // Emerald-500
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.star_rounded, color: Colors.white, size: 10),
+                    const SizedBox(width: 2),
+                    Text(
+                      '+₹${widget.order.tipAmount.toStringAsFixed(0)} Tip',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
               const Text(
                 'Live GPS + radius',
-              style: TextStyle(
-                color: AppTheme.primary,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
+                style: TextStyle(
+                  color: AppTheme.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
           ],
         ),
       );
@@ -377,9 +419,9 @@ class _LeadFeedCardState extends State<LeadFeedCard>
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF7ED),
-          borderRadius: const BorderRadius.only(
+        decoration: const BoxDecoration(
+          color: Color(0xFFFFF7ED),
+          borderRadius: BorderRadius.only(
             topLeft: Radius.circular(18),
             topRight: Radius.circular(18),
           ),
@@ -402,14 +444,38 @@ class _LeadFeedCardState extends State<LeadFeedCard>
               ),
             ),
             const Spacer(),
-            const Text(
-              'Working hours checked',
-              style: TextStyle(
-                color: Color(0xFFEA580C),
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
+            if (widget.order.tipAmount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981), // Emerald-500
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.star_rounded, color: Colors.white, size: 10),
+                    const SizedBox(width: 2),
+                    Text(
+                      '+₹${widget.order.tipAmount.toStringAsFixed(0)} Tip',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              const Text(
+                'Working hours checked',
+                style: TextStyle(
+                  color: Color(0xFFEA580C),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
           ],
         ),
       );

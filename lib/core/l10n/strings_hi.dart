@@ -2,436 +2,754 @@ import 'app_localizations.dart';
 
 const Map<String, String> stringsHi = {
   // App Info
-  'appName': 'स्क्रैपवेल पार्टनर',
-  'appTagline': 'पास के पिकअप से अधिक कमाएं',
+  'appName': 'Scrapwell Partner',
+  'appTagline': 'पास के Pickup लेकर ज्यादा कमाएं',
 
   // Language Screen
-  'selectLanguage': 'भाषा चुनें',
-  'languageContinue': 'जारी रखें',
+  'selectLanguage': 'अपनी भाषा चुनें',
+  'languageContinue': 'आगे बढ़ें',
   'langEnglish': 'English',
   'langHindi': 'हिंदी',
 
   // Onboarding
-  'onb1Title': 'पास के पिकअप से अधिक कमाएं',
+  'onb1Title': 'पास के Pickup लेकर ज्यादा कमाएं',
   'onb1Body':
-      'आपके आस-पास के ग्राहकों से स्क्रैप पिकअप लीड प्राप्त करें। तुरंत स्वीकार करें और अपना व्यवसाय बढ़ाएं।',
-  'onb2Title': 'सेकंड में पिकअप स्वीकार करें',
+      'अपने आसपास के Customers से Pickup Lead पाएं। जल्दी Accept करें और अपनी कमाई बढ़ाएं।',
+
+  'onb2Title': 'कुछ सेकंड में Pickup Accept करें',
   'onb2Body':
-      'पिकअप अनुरोधों के लिए रियल-टाइम अलर्ट प्राप्त करें। पहले स्वीकार करें और ऑर्डर सुरक्षित करें।',
-  'onb3Title': 'नेविगेट, वजन करें और पूरा करें',
+      'नया Pickup आते ही तुरंत Notification मिलेगा। सबसे पहले Accept करें और Order पाएं।',
+
+  'onb3Title': 'Pickup करें और कमाई पाएं',
   'onb3Body':
-      'बिल्ट-इन नेविगेशन का उपयोग करें, साइट पर स्क्रैप का वजन करें, भुगतान की पुष्टि करें और दैनिक कमाई ट्रैक करें।',
+      'Customer तक जाएं, Scrap का Weight करें, Payment Confirm करें और अपनी Daily Earnings देखें।',
+
   'getStarted': 'शुरू करें',
   'next': 'आगे',
-  'skip': 'छोड़ें',
+  'skip': 'Skip',
 
   // Auth
-  'enterPhone': 'मोबाइल नंबर दर्ज करें',
+  'enterPhone': 'मोबाइल नंबर डालें',
   'phoneHint': 'मोबाइल नंबर',
-  'continueBtn': 'जारी रखें',
-  'enterOtp': 'नंबर सत्यापित करें',
-  'otpSentTo': 'OTP भेजा गया ',
-  'resendOtp': 'OTP पुनः भेजें',
-  'resendIn': 'पुनः भेजें ',
-  'verifyOtp': 'सत्यापित करें और जारी रखें',
-  'invalidOtp': 'अमान्य OTP। कृपया पुनः प्रयास करें।',
-  'otpExpired': 'OTP समाप्त हो गया। नया अनुरोध करें।',
+  'continueBtn': 'Continue',
+  'enterOtp': 'OTP Verify करें',
+  'otpSentTo': 'OTP भेजा गया',
+  'resendOtp': 'OTP दोबारा भेजें',
+  'resendIn': 'दोबारा भेजें',
+  'verifyOtp': 'Verify करके आगे बढ़ें',
+  'invalidOtp': 'गलत OTP, फिर से कोशिश करें।',
+  'otpExpired': 'OTP Expire हो गया। नया OTP भेजें।',
 
   // Registration
-  'partnerReg': 'पार्टनर पंजीकरण',
+  'partnerReg': 'Partner Registration',
   'fullName': 'पूरा नाम',
-  'shopName': 'दुकान का नाम',
-  'shopAddress': 'दुकान का पता',
-  'shopLocation': 'मानचित्र पर दुकान का स्थान',
-  'scrapCategories': 'स्वीकृत स्क्रैप श्रेणियां',
-  'profilePhoto': 'प्रोफ़ाइल फोटो',
-  'shopPhoto': 'दुकान की फोटो',
-  'gstOptional': 'GST नंबर (वैकल्पिक)',
-  'aadhaarOptional': 'आधार नंबर (वैकल्पिक)',
-  'vehicleType': 'वाहन प्रकार',
-  'workingHours': 'कार्य समय',
-  'submitReg': 'अनुमोदन के लिए जमा करें',
-  'step': 'चरण',
-  'of': 'में से',
-  'stepBasicInfoTitle': 'अपने बारे में बताएं',
-  'stepBasicInfoSub': 'यह जानकारी ग्राहकों को दिखाई जाएगी',
+  'shopName': 'Shop का नाम',
+  'shopAddress': 'Shop का पता',
+  'shopLocation': 'Shop Location',
+  'scrapCategories': 'आप कौन-कौन सा Scrap लेते हैं?',
+  'profilePhoto': 'Profile Photo',
+  'shopPhoto': 'Shop Photo',
+  'gstOptional': 'GST नंबर (Optional)',
+  'aadhaarOptional': 'Aadhaar नंबर (Optional)',
+  'vehicleType': 'Vehicle Type',
+  'workingHours': 'काम का समय',
+  'submitReg': 'Approval के लिए Submit करें',
+
+  'step': 'Step',
+  'of': 'of',
+
+  'stepBasicInfoTitle': 'अपनी जानकारी भरें',
+  'stepBasicInfoSub': 'यह जानकारी Customer को दिखाई जाएगी',
+
   'nameVerifiedInfo':
-      'दस्तावेज़ सत्यापन के दौरान आपके नाम का आधार से मिलान किया जाएगा।',
-  'shopDetailsTitle': 'दुकान का विवरण',
-  'shopDetailsSub': 'आपकी दुकान कहाँ स्थित है?',
-  'tapToSetLocation': 'दुकान का स्थान सेट करने के लिए मानचित्र पर टैप करें',
-  'categoriesTitle': 'स्क्रैप श्रेणियां',
-  'categoriesSub': 'आप किस प्रकार का स्क्रैप स्वीकार करते हैं?',
-  'selected': 'चयनित',
+      'Verification के समय आपका नाम Aadhaar से Match किया जाएगा।',
+
+  'shopDetailsTitle': 'Shop की जानकारी',
+  'shopDetailsSub': 'आपकी Shop कहाँ है?',
+
+  'tapToSetLocation': 'Map पर टैप करके Shop Location चुनें',
+
+  'categoriesTitle': 'Scrap Categories',
+  'categoriesSub': 'आप कौन-कौन सा Scrap खरीदते हैं?',
+
+  'selected': 'Selected',
+
   'categoriesInfo':
-      'उन सभी श्रेणियों का चयन करें जिन्हें आप स्वीकार करते हैं। आप इसे बाद में अपडेट कर सकते हैं।',
-  'vehicleTitle': 'वाहन और कार्य समय',
-  'vehicleSub': 'आप स्क्रैप कैसे उठाते हैं?',
-  'vehicleTypeLabel': 'वाहन का प्रकार',
-  'workingHoursLabel': 'कार्य समय',
+      'जो Scrap आप खरीदते हैं उन्हें Select करें। बाद में भी बदल सकते हैं।',
+
+  'vehicleTitle': 'Vehicle और काम का समय',
+
+  'vehicleSub': 'Pickup के लिए आप कौन सा Vehicle इस्तेमाल करते हैं?',
+
+  'vehicleTypeLabel': 'Vehicle',
+
+  'workingHoursLabel': 'काम का समय',
+
   'opensAt': 'खुलने का समय',
+
   'closesAt': 'बंद होने का समय',
-  'allSetInfo': 'आप तैयार हैं! पिकअप अनुरोध प्राप्त करने के लिए जमा करें।',
-  'regFailed': 'पंजीकरण विफल। कृपया पुनः प्रयास करें।',
+
+  'allSetInfo': 'सब तैयार है! अब Submit करें और Pickup मिलना शुरू होगा।',
+
+  'regFailed': 'Registration पूरा नहीं हुआ। फिर से कोशिश करें।',
 
   // Pending
-  'pendingTitle': 'खाता सत्यापन में है',
+  'pendingTitle': 'आपका Account Verify हो रहा है',
+
   'pendingBody':
-      'हमारी टीम आपके विवरण की समीक्षा कर रही है। अनुमोदन के बाद 24 घंटे के भीतर आपको सूचित किया जाएगा।',
-  'contactSupport': 'सहायता से संपर्क करें',
+      'हमारी Team आपकी जानकारी Check कर रही है। Approval मिलते ही आपको Notification मिल जाएगा।',
+
+  'contactSupport': 'Support से संपर्क करें',
 
   // Home
   'hello': 'नमस्ते',
-  'goodMorning': 'सुप्रभात',
-  'goodAfternoon': 'नमस्कार',
-  'goodEvening': 'शुभ संध्या',
-  'goOnline': 'ऑनलाइन हों',
-  'goOffline': 'ऑफलाइन हों',
-  'youAreOnline': 'आप ऑनलाइन हैं',
-  'youAreOffline': 'आप ऑफलाइन हैं',
-  'receivingRequests': 'पास के पिकअप अनुरोध प्राप्त हो रहे हैं',
-  'notReceivingRequests': 'कोई अनुरोध प्राप्त नहीं हो रहा',
+
+  'goodMorning': 'Good Morning',
+
+  'goodAfternoon': 'Good Afternoon',
+
+  'goodEvening': 'Good Evening',
+
+  'goOnline': 'Online जाएं',
+
+  'goOffline': 'Offline जाएं',
+
+  'youAreOnline': 'आप Online हैं',
+
+  'youAreOffline': 'आप Offline हैं',
+
+  'receivingRequests': 'आपको Nearby Pickup मिल रहे हैं',
+
+  'notReceivingRequests': 'अभी कोई Pickup नहीं मिल रहा',
+
   'todayEarnings': 'आज की कमाई',
-  'ordersToday': 'आज के ऑर्डर',
-  'nearbyRequests': 'पास के अनुरोध',
-  'noNearbyRequests': 'अभी कोई पास का अनुरोध नहीं',
-  'goOnlineToReceive': 'पिकअप अनुरोध प्राप्त करने के लिए ऑनलाइन हों',
+
+  'ordersToday': 'आज के Orders',
+
+  'nearbyRequests': 'Nearby Pickups',
+
+  'noNearbyRequests': 'अभी कोई Pickup उपलब्ध नहीं',
+
+  'goOnlineToReceive': 'Pickup पाने के लिए Online हो जाएं',
 
   // Lead Popup
-  'newPickupRequest': 'नया पिकअप अनुरोध!',
-  'accept': 'स्वीकार करें',
-  'decline': 'अस्वीकार करें',
-  'estimatedValue': 'अनुमानित मूल्य',
-  'distance': 'दूरी',
-  'scrapTypes': 'स्क्रैप प्रकार',
-  'approxWeight': 'अनुमानित वजन',
-  'pickupSlot': 'पिकअप समय',
-  'customerNotes': 'ग्राहक नोट्स',
-  'requestExpiry': 'अनुरोध समाप्त होगा',
+  'newPickupRequest': '🎉 नया Pickup आया!',
+
+  'accept': 'Accept',
+
+  'decline': 'Skip',
+
+  'estimatedValue': 'अनुमानित कीमत',
+
+  'distance': 'Distance',
+
+  'scrapTypes': 'Scrap',
+
+  'approxWeight': 'अनुमानित Weight',
+
+  'pickupSlot': 'Pickup Time',
+
+  'customerNotes': 'Customer Note',
+
+  'requestExpiry': 'यह Request जल्द खत्म हो जाएगी',
 
   // Order Tracking
-  'orderDetails': 'ऑर्डर विवरण',
-  'startNavigation': 'नेविगेशन शुरू करें',
-  'iArrived': 'मैं पहुंच गया',
-  'arrived': 'मैं पहुंच गया',
-  'startPickup': 'पिकअप शुरू करें',
-  'startPickupWeighing': 'पिकअप और तौल शुरू करें',
-  'callCustomer': 'ग्राहक को कॉल करें',
-  'chatSupport': 'चैट सहायता',
-  'customerDetails': 'ग्राहक विवरण',
-  'scrapDetails': 'स्क्रैप विवरण',
-  'scrapPhotos': 'स्क्रैप फ़ोटो',
-  'headToCustomer': 'ग्राहक के स्थान पर जाएं',
-  'arrivingAtDest': 'ग्राहक के गंतव्य पर पहुंच रहे हैं',
-  'orderPickupType': 'पिकअप प्रकार',
-  'instantPickup': 'तत्काल पिकअप',
-  'scheduledPickup': 'अनुसूचित पिकअप',
+  'orderDetails': 'Order Details',
+
+  'startNavigation': 'Navigation शुरू करें',
+
+  'iArrived': 'मैं पहुँच गया',
+
+  'arrived': 'मैं पहुँच गया',
+
+  'startPickup': 'Pickup शुरू करें',
+
+  'startPickupWeighing': 'Pickup और Weight शुरू करें',
+
+  'callCustomer': 'Customer को Call करें',
+
+  'chatSupport': 'Support Chat',
+
+  'customerDetails': 'Customer Details',
+
+  'scrapDetails': 'Scrap Details',
+
+  'scrapPhotos': 'Scrap Photos',
+
+  'headToCustomer': 'Customer के पास जाएं',
+
+  'arrivingAtDest': 'Customer के पास पहुँच रहे हैं',
+
+  'orderPickupType': 'Pickup Type',
+
+  'instantPickup': 'Instant Pickup',
+
+  'scheduledPickup': 'Scheduled Pickup',
 
   // Weighing
-  'enterWeights': 'स्क्रैप का वजन दर्ज करें',
-  'enterWeightsTitle': 'वास्तविक वजन दर्ज करें',
-  'finalPayout': 'अंतिम भुगतान',
-  'weight': 'वजन (kg)',
-  'rate': 'दर (₹/kg)',
+  'enterWeights': 'Weight दर्ज करें',
+
+  'enterWeightsTitle': 'Actual Weight दर्ज करें',
+
+  'finalPayout': 'Final Payment',
+
+  'weight': 'Weight (kg)',
+
+  'rate': 'Rate (₹/kg)',
+
   'total': 'कुल',
-  'totalPayout': 'कुल भुगतान',
-  'confirmPickup': 'पुष्टि करें और ग्राहक को भेजें',
-  'waitingCustomer': 'ग्राहक की पुष्टि की प्रतीक्षा...',
+
+  'totalPayout': 'Total Payment',
+
+  'confirmPickup': 'Customer को भेजें',
+
+  'waitingCustomer': 'Customer के Confirm करने का इंतज़ार...',
+
   'kg': 'kg',
-  'weighingMachinePhoto': 'वजन मशीन की फोटो',
-  'takeWeighingPhoto': 'वजन मशीन की फोटो लें (रीडिंग के साथ)',
-  'photoRequiredError': 'जारी रखने के लिए कृपया वजन मशीन की फोटो अपलोड करें',
-  'weighingPhotoSubmitting': 'वजन मशीन की फोटो अपलोड हो रही है...',
-  'customerRate': 'ग्राहक दर',
-  'originalRate': 'मूल दर',
+
+  'weighingMachinePhoto': 'Weight Machine Photo',
+
+  'takeWeighingPhoto': 'Weight Machine की Photo लें',
+
+  'photoRequiredError': 'आगे बढ़ने के लिए Photo Upload करें',
+
+  'weighingPhotoSubmitting': 'Photo Upload हो रही है...',
+
+  'customerRate': 'Customer Rate',
+
+  'originalRate': 'Original Rate',
+
   'yourEarnings': 'आपकी कमाई',
-  'paidToCustomer': 'ग्राहक को भुगतान',
-  'commissionLabel': 'प्लेटफ़ॉर्म कमीशन (2%)',
+
+  'paidToCustomer': 'Customer को Payment',
+
+  'commissionLabel': 'Scrapwell Commission (2%)',
+
   'commission2Percent': '₹{amount} का 2%',
-  'orderBilling': 'ऑर्डर बिलिंग',
-  'pickupComplete': 'पिकअप पूर्ण!',
-  'earningsUpdated': 'आपकी कमाई अपडेट हो गई है।',
-  'customerPaidConfirmed': 'ग्राहक भुगतान की पुष्टि हुई।',
-  'itemSubtotal': 'उप-कुल',
+
+  'orderBilling': 'Order Bill',
+
+  'pickupComplete': '🎉 Pickup पूरा हुआ!',
+
+  'earningsUpdated': 'आपकी कमाई Update हो गई।',
+
+  'customerPaidConfirmed': 'Customer ने Payment Confirm कर दिया।',
+
+  'itemSubtotal': 'Subtotal',
+
   'weightKg': '{weight} kg',
+
   'ratePerKg': '₹{rate}/kg',
 
   // Orders
-  'myOrders': 'मेरे ऑर्डर',
-  'active': 'सक्रिय',
-  'completed': 'पूर्ण',
-  'cancelled': 'रद्द',
-  'noActiveOrders': 'कोई सक्रिय ऑर्डर नहीं',
-  'noCompletedOrders': 'अभी तक कोई पूर्ण ऑर्डर नहीं',
-  'noCancelledOrders': 'कोई रद्द ऑर्डर नहीं',
-  'orderBillingDetail': 'ऑर्डर बिलिंग विवरण',
-  'scrapBreakdown': 'स्क्रैप विवरण',
-  'paymentSummary': 'भुगतान सारांश',
-  'pickupDetails': 'पिकअप विवरण',
-  'completedOn': 'पूर्ण तिथि',
-  'noScrapItems': 'कोई स्क्रैप आइटम दर्ज नहीं',
-  'scheduledFor': 'अनुसूचित समय',
-  'pickupIn': 'पिकअप बाद में',
+  'myOrders': 'मेरे Orders',
+
+  'active': 'Active',
+
+  'completed': 'Completed',
+
+  'cancelled': 'Cancelled',
+
+  'noActiveOrders': 'कोई Active Order नहीं',
+
+  'noCompletedOrders': 'अभी तक कोई Completed Order नहीं',
+
+  'noCancelledOrders': 'कोई Cancelled Order नहीं',
+
+  'orderBillingDetail': 'Order Bill',
+
+  'scrapBreakdown': 'Scrap Details',
+
+  'paymentSummary': 'Payment Summary',
+
+  'pickupDetails': 'Pickup Details',
+
+  'completedOn': 'पूरा हुआ',
+
+  'noScrapItems': 'कोई Scrap Item नहीं',
+
+  'scheduledFor': 'Pickup Time',
+
+  'pickupIn': 'बाद में Pickup',
+
   'pickupToday': 'आज',
+
   'pickupTomorrow': 'कल',
+
   'countdownHours': '{h}घं {m}मि',
+
   'countdownMins': '{m} मिनट बाकी',
-  'startTripNow': 'यात्रा शुरू करें',
-  'cancelReservationShort': 'रद्द करें',
-  'scheduledPickupAssigned': 'अनुसूचित पिकअप सौंपा गया',
+
+  'startTripNow': 'Pickup शुरू करें',
+
+  'cancelReservationShort': 'Cancel',
+
+  'scheduledPickupAssigned': 'Scheduled Pickup मिल गया',
 
   // Earnings
   'earnings': 'कमाई',
+
   'today': 'आज',
-  'thisWeek': 'इस सप्ताह',
+
+  'thisWeek': 'इस हफ्ते',
+
   'thisMonth': 'इस महीने',
-  'pickupsCompleted': 'पूर्ण पिकअप',
-  'walletBalance': 'वॉलेट बैलेंस',
+
+  'pickupsCompleted': 'Pickup पूरे',
+
+  'walletBalance': 'Wallet Balance',
 
   // Profile
-  'myProfile': 'मेरी प्रोफ़ाइल',
-  'editProfile': 'प्रोफ़ाइल संपादित करें',
-  'documents': 'दस्तावेज़',
-  'language': 'भाषा',
-  'notifications': 'सूचनाएं',
-  'helpSupport': 'सहायता और समर्थन',
-  'logout': 'लॉग आउट',
-  'logoutConfirm': 'क्या आप वाकई लॉग आउट करना चाहते हैं?',
-  'cancel': 'रद्द करें',
+  'myProfile': 'My Profile',
 
+  'editProfile': 'Profile Edit करें',
+
+  'documents': 'Documents',
+
+  'language': 'Language',
+
+  'notifications': 'Notifications',
+
+  'helpSupport': 'Help & Support',
+
+  'logout': 'Logout',
+
+  'logoutConfirm': 'क्या आप Logout करना चाहते हैं?',
+
+  'cancel': 'Cancel',
   // Scrap Categories
-  'paper': 'कागज',
-  'plastic': 'प्लास्टिक',
-  'metal': 'धातु',
-  'ewaste': 'ई-वेस्ट',
-  'glass': 'कांच',
-  'cardboard': 'गत्ता',
-  'rubber': 'रबर',
+  'paper': 'Paper',
+  'plastic': 'Plastic',
+  'metal': 'Metal',
+  'ewaste': 'E-Waste',
+  'glass': 'Glass',
+  'cardboard': 'Cardboard',
+  'rubber': 'Rubber',
   'clothes': 'कपड़े',
-  'mixedScrap': 'मिश्रित स्क्रैप',
+  'mixedScrap': 'Mixed Scrap',
 
   // Common
   'loading': 'लोड हो रहा है...',
-  'error': 'कुछ गलत हो गया',
-  'retry': 'पुनः प्रयास करें',
-  'save': 'सहेजें',
+  'error': 'कुछ गड़बड़ हो गई',
+  'retry': 'फिर से कोशिश करें',
+  'save': 'Save करें',
   'done': 'हो गया',
   'back': 'वापस',
-  'optional': 'वैकल्पिक',
-  'required': 'आवश्यक',
-  'uploadPhoto': 'फोटो अपलोड करें',
-  'tapToSelect': 'चुनने के लिए टैप करें',
-  'setLocation': 'स्थान सेट करें',
-  'permissionRequired': 'स्थान अनुमति आवश्यक है',
-  'errorNoProfileImage': 'कृपया प्रोफ़ाइल फोटो चुनें',
-  'errorNoName': 'कृपया अपना पूरा नाम दर्ज करें',
-  'errorNoShopName': 'कृपया अपनी दुकान का नाम दर्ज करें',
-  'errorNoShopAddress': 'कृपया अपनी दुकान का पता दर्ज करें',
-  'errorNoCategories': 'कृपया कम से कम एक श्रेणी चुनें',
-  'camera': 'कैमरा',
-  'gallery': 'गैलरी',
-  'fetchLocation': 'वर्तमान स्थान का उपयोग करें',
-  'exactAddress': 'दुकान का सटीक पता (दुकान नं., भवन)',
-  'exactAddressHint': 'जैसे: दुकान नं. 12, ग्राउंड फ्लोर',
-  'otherCategory': 'अन्य',
-  'enterOtherCategory': 'अन्य श्रेणी दर्ज करें',
-  'errorNoAadhaar': 'कृपया मान्य 12 अंकों का आधार नंबर दर्ज करें',
-  'errorNoAadhaarFront': 'कृपया आधार के सामने की फोटो चुनें',
-  'errorNoAadhaarBack': 'कृपया आधार के पीछे की फोटो चुनें',
-  'errorNoExactAddress': 'कृपया अपनी दुकान का सटीक पता दर्ज करें',
-  'errorNoVehicle': 'कृपया कम से कम एक वाहन चुनें',
-  'aadhaarFront': 'आधार सामने',
-  'aadhaarBack': 'आधार पीछे',
-  'aadhaarRequired': 'आधार नंबर',
+  'optional': 'Optional',
+  'required': 'ज़रूरी',
+  'uploadPhoto': 'Photo Upload करें',
+  'tapToSelect': 'Select करने के लिए टैप करें',
+  'setLocation': 'Location सेट करें',
+  'permissionRequired': 'Location Permission ज़रूरी है',
+
+  'errorNoProfileImage': 'Profile Photo चुनें',
+  'errorNoName': 'पूरा नाम दर्ज करें',
+  'errorNoShopName': 'Shop का नाम दर्ज करें',
+  'errorNoShopAddress': 'Shop का पता दर्ज करें',
+  'errorNoCategories': 'कम से कम एक Category चुनें',
+
+  'camera': 'Camera',
+  'gallery': 'Gallery',
+
+  'fetchLocation': 'Current Location इस्तेमाल करें',
+
+  'exactAddress': 'Shop का पूरा पता (Shop No., Building)',
+  'exactAddressHint': 'जैसे: Shop No. 12, Ground Floor',
+
+  'otherCategory': 'Other',
+  'enterOtherCategory': 'Category का नाम लिखें',
+
+  'errorNoAadhaar': 'सही 12 अंकों का Aadhaar नंबर डालें',
+  'errorInvalidAadhaar': 'गलत Aadhaar नंबर है। कृपया जांचें और दोबारा डालें।',
+
+  'errorNoAadhaarFront': 'Aadhaar के Front Side की Photo चुनें',
+
+  'errorNoAadhaarBack': 'Aadhaar के Back Side की Photo चुनें',
+
+  'errorNoExactAddress': 'Shop का पूरा पता दर्ज करें',
+
+  'errorNoVehicle': 'कम से कम एक Vehicle चुनें',
+
+  'aadhaarFront': 'Aadhaar Front',
+  'aadhaarBack': 'Aadhaar Back',
+  'aadhaarRequired': 'Aadhaar नंबर',
 
   // Home Screen
-  'greetingMorning': 'सुप्रभात',
-  'greetingAfternoon': 'शुभ दोपहर',
-  'greetingEvening': 'शुभ संध्या',
+  'greetingMorning': 'Good Morning',
+  'greetingAfternoon': 'Good Afternoon',
+  'greetingEvening': 'Good Evening',
+
   'todaysEarn': 'आज की कमाई',
   'totalEarnings': 'कुल कमाई',
-  'totalOrders': 'कुल ऑर्डर',
-  'rating': 'रेटिंग',
-  'liveRequests': 'आपके आस-पास लाइव पिकअप अनुरोध',
-  'goOnlineToSeeRequests': 'अनुरोध देखने के लिए ऑनलाइन जाएं',
-  'live': 'लाइव',
-  'tapToggleToStart': 'अनुरोध प्राप्त करने के लिए टॉगल पर टैप करें',
-  'offlineSub': 'आसपास के पिकअप अनुरोध प्राप्त\nकरने के लिए ऑनलाइन टॉगल करें',
-  'noRequestsSub':
-      'जैसे ही कोई ग्राहक आपके आस-पास\nपिकअप का अनुरोध करेगा, आपको सूचित किया जाएगा',
-  'scanningRadius': '10 किमी के दायरे में स्कैनिंग',
-  'searchRadius': 'खोज दायरा',
-  'scanningRadiusDynamic': '{radius} किमी दायरे में स्कैनिंग',
+  'totalOrders': 'कुल Orders',
 
-  // Legal & Compliance Stack
-  'myBusinessProfile': 'मेरा व्यापार प्रोफ़ाइल',
-  'verificationStatus': 'सत्यापन की स्थिति',
-  'earningsSettlements': 'कमाई और भुगतान',
-  'safetyCenter': 'सुरक्षा केंद्र',
-  'privacyData': 'गोपनीयता और डेटा',
-  'legalCompliance': 'कानूनी और अनुपालन',
-  'aboutScrapwell': 'स्क्रैपवेल के बारे में',
-  'verifiedPartner': 'सत्यापित भागीदार',
-  'trustScore': 'विश्वास स्कोर',
-  'completionRate': 'पूर्णता दर',
-  'cancellationRate': 'रद्दीकरण दर',
-  'customerRating': 'ग्राहक रेटिंग',
-  'fraudIndex': 'धोखाधड़ी सूचकांक',
-  'reportCustomerMisconduct': 'ग्राहक दुर्व्यवहार की रिपोर्ट करें',
-  'reportFraud': 'धोखाधड़ी / बाईपास रिपोर्ट करें',
-  'emergencySupport': 'आपातकालीन सहायता (SOS)',
-  'pickupSafetyGuidelines': 'पिकअप सुरक्षा दिशानिर्देश',
-  'harassmentReporting': 'उत्पीड़न की रिपोर्टिंग',
-  'downloadMyData': 'मेरा डेटा डाउनलोड करें',
-  'managePermissions': 'अनुमतियां प्रबंधित करें',
-  'deleteAccount': 'खाता हटाएं',
-  'grievanceRedressal': 'शिकायत निवारण',
-  'disputeResolution': 'विवाद समाधान',
-  'partnerTerms': 'पार्टनर नियम व शर्तें',
-  'partnerCodeOfConduct': 'पार्टनर आचार संहिता',
-  'leadOwnershipPolicy': 'लीड स्वामित्व नीति',
-  'antiCircumventionPolicy': 'एंटी-सर्कमवेंशन नीति',
-  'commissionSettlementPolicy': 'कमीशन और निपटान नीति',
-  'safetyPolicy': 'सुरक्षा नीति',
-  'pickupGuidelines': 'पिकअप दिशानिर्देश',
-  'customerInteractionPolicy': 'ग्राहक सहभागिता नीति',
-  'communityStandards': 'सामुदायिक मानक',
-  'privacyPolicy': 'गोपनीयता नीति',
-  'dataRetentionPolicy': 'डेटा प्रतिधारण नीति',
-  'aadhaarHandlingPolicy': 'आधार हैंडलिंग नीति',
-  'accountDeletionPolicy': 'खाता विलोपन नीति',
-  'grievanceRedressalPolicy': 'शिकायत निवारण नीति',
-  'disputeResolutionPolicy': 'विवाद समाधान नीति',
-  'rateWeightCompliancePolicy': 'दर और वजन अनुपालन नीति',
-  'businessRelationship': 'व्यापारिक संबंध',
-  'safetyOperations': 'सुरक्षा और संचालन',
-  'privacyCompliance': 'गोपनीयता और अनुपालन',
-  'support': 'समर्थन',
-  'identityVerification': 'पहचान सत्यापन',
-  'businessVerification': 'व्यवसाय सत्यापन',
-  'bankVerification': 'बैंक सत्यापन',
-  'locationVerification': 'स्थान सत्यापन',
-  'aadhaarVerification': 'आधार सत्यापन',
-  'shopPhotos': 'दुकान की तस्वीरें',
-  'businessInformation': 'व्यावसायिक जानकारी',
-  'settlementAccountVerification': 'निपटान खाता सत्यापन',
-  'businessAddressVerification': 'व्यापारिक पता सत्यापन',
-  'pending': 'लंबित',
-  'underReview': 'समीक्षा के अधीन',
-  'approved': 'स्वीकृत',
-  'rejected': 'अस्वीकृत',
-  'verifyPickupOtp': 'पिकअप OTP सत्यापित करें',
-  'askCustomerOtp': 'पिकअप शुरू करने के लिए कृपया ग्राहक से 4-अंकीय सत्यापन OTP मांगें।',
-  'incorrectOtp': 'गलत OTP। कृपया पुनः प्रयास करें।',
-  'cancelPickup': 'पिकअप रद्द करें',
-  'confirmCancel': 'रद्द करने की पुष्टि करें',
+  'rating': 'Rating',
+
+  'liveRequests': 'Nearby Live Pickups',
+
+  'goOnlineToSeeRequests': 'Pickup देखने के लिए Online जाएं',
+
+  'live': 'LIVE',
+
+  'tapToggleToStart': 'Pickup पाने के लिए Online करें',
+
+  'offlineSub': 'Nearby Pickup पाने के लिए\nOnline हो जाएं',
+
+  'noRequestsSub':
+      'जैसे ही आपके पास कोई नया Pickup आएगा,\nआपको तुरंत Notification मिलेगा',
+
+  'scanningRadius': '10 KM के अंदर Pickup ढूंढे जा रहे हैं',
+
+  'searchRadius': 'Search Radius',
+
+  'scanningRadiusDynamic': '{radius} KM के अंदर Pickup ढूंढे जा रहे हैं',
+
+  // Legal & Compliance
+  'myBusinessProfile': 'Business Profile',
+
+  'verificationStatus': 'Verification Status',
+
+  'earningsSettlements': 'कमाई और Payment',
+
+  'safetyCenter': 'Safety Center',
+
+  'privacyData': 'Privacy & Data',
+
+  'legalCompliance': 'Legal',
+
+  'aboutScrapwell': 'About Scrapwell',
+
+  'verifiedPartner': 'Verified Partner',
+
+  'trustScore': 'Trust Score',
+
+  'completionRate': 'Completion Rate',
+
+  'cancellationRate': 'Cancellation Rate',
+
+  'customerRating': 'Customer Rating',
+
+  'fraudIndex': 'Fraud Score',
+
+  'reportCustomerMisconduct': 'Customer की शिकायत करें',
+
+  'reportFraud': 'Fraud Report करें',
+
+  'emergencySupport': 'Emergency Help (SOS)',
+
+  'pickupSafetyGuidelines': 'Pickup Safety Tips',
+
+  'harassmentReporting': 'Harassment Report',
+
+  'downloadMyData': 'मेरा Data Download करें',
+
+  'managePermissions': 'Permissions Manage करें',
+
+  'deleteAccount': 'Account Delete करें',
+
+  'grievanceRedressal': 'Complaint',
+
+  'disputeResolution': 'Dispute Resolution',
+
+  'partnerTerms': 'Partner Terms & Conditions',
+
+  'partnerCodeOfConduct': 'Partner Rules',
+
+  'leadOwnershipPolicy': 'Lead Policy',
+
+  'antiCircumventionPolicy': 'Bypass Policy',
+
+  'commissionSettlementPolicy': 'Commission Policy',
+
+  'safetyPolicy': 'Safety Policy',
+
+  'pickupGuidelines': 'Pickup Guidelines',
+
+  'customerInteractionPolicy': 'Customer Policy',
+
+  'communityStandards': 'Community Rules',
+
+  'privacyPolicy': 'Privacy Policy',
+
+  'dataRetentionPolicy': 'Data Policy',
+
+  'aadhaarHandlingPolicy': 'Aadhaar Policy',
+
+  'accountDeletionPolicy': 'Account Delete Policy',
+
+  'grievanceRedressalPolicy': 'Complaint Policy',
+
+  'disputeResolutionPolicy': 'Dispute Policy',
+
+  'rateWeightCompliancePolicy': 'Rate & Weight Policy',
+
+  'businessRelationship': 'Business Details',
+
+  'safetyOperations': 'Safety',
+
+  'privacyCompliance': 'Privacy',
+
+  'support': 'Support',
+
+  'identityVerification': 'Identity Verification',
+
+  'businessVerification': 'Business Verification',
+
+  'bankVerification': 'Bank Verification',
+
+  'locationVerification': 'Location Verification',
+
+  'aadhaarVerification': 'Aadhaar Verification',
+
+  'shopPhotos': 'Shop Photos',
+
+  'businessInformation': 'Business Information',
+
+  'settlementAccountVerification': 'Bank Account Verification',
+
+  'businessAddressVerification': 'Shop Address Verification',
+
+  'pending': 'Pending',
+
+  'underReview': 'Review में',
+
+  'approved': 'Approved',
+
+  'rejected': 'Rejected',
+
+  'verifyPickupOtp': 'Pickup OTP Verify करें',
+
+  'askCustomerOtp': 'Pickup शुरू करने के लिए Customer से 4 अंकों का OTP पूछें।',
+
+  'incorrectOtp': 'गलत OTP, फिर से कोशिश करें।',
+
+  'cancelPickup': 'Pickup Cancel करें',
+
+  'confirmCancel': 'Cancel Confirm करें',
+
   'goBack': 'वापस जाएं',
-  'scheduledBookings': 'अनुसूचित बुकिंग (आरक्षित)',
-  'bookedAndPending': 'बुक और लंबित',
-  'lockedCannotCancel': 'लॉक: पिकअप के 1 घंटे के भीतर रद्द नहीं किया जा सकता',
-  'cancelReservation': 'आरक्षण रद्द करें',
-  'cancelReservationConfirm': 'रद्द करने से यह स्लॉट खाली हो जाएगा और पिकअप स्वचालित रूप से दूसरे निकटतम उपलब्ध भागीदार को सौंप दिया जाएगा।',
-  'goOnlineToStart': 'आप ऑफलाइन हैं। समय होने पर इस अनुसूचित यात्रा को शुरू करने के लिए ऑनलाइन जाएं।',
-  'offlineWarning': 'ऑफलाइन मोड',
-  'verificationCenterTitle': 'सत्यापन केंद्र',
-  'recycleWithTrust': 'विश्वास के साथ रीसायकल करें',
-  'verificationBenefits': 'सत्यापन के लाभ',
-  'verifiedBadgeBenefit': 'लीड्स और ऑर्डर के लिए प्राथमिकता रूटिंग',
-  'bulkLeadsBenefit': 'थोक और वाणिज्यिक पिकअप तक पहुंच',
-  'fastSettlementsBenefit': 'त्वरित और स्वचालित वॉलेट भुगतान',
-  'aadhaarDesc': 'राष्ट्रीय आईडी सत्यापन मंच की प्रामाणिकता स्थापित करता है।',
-  'businessDesc': 'पंजीकरण विवरण और जीएसटी (वैकल्पिक) आपके स्क्रैप ब्रांड को स्थापित करते हैं।',
-  'paymentDesc': 'सत्यापित बैंक खाते त्वरित, स्वचालित भुगतान सुरक्षित करते हैं।',
-  'locationDesc': 'सटीक जीपीएस मैपिंग ग्राहकों को आपकी दुकान तक पहुंचाने में मदद करती है।',
-  'verified': 'सत्यापित',
-  'notVerified': 'सत्यापित नहीं',
-  'underVerification': 'सत्यापन के अधीन',
-  'tapToVerify': 'सत्यापित करने के लिए टैप करें',
-  'trustScoreDesc': 'एक उच्च विश्वास स्कोर सुनिश्चित करता है कि आपको उच्च-मूल्य वाले लीड मिलें।',
-  'completionRateDesc': 'अपनी रेटिंग बनाए रखने के लिए अपने स्वीकृत पिकअप को पूरा करते रहें।',
-  'cancellationRateDesc': 'बार-बार रद्दीकरण से लीड प्राथमिकता सीमित हो जाती है।',
-  'profilePreview': 'प्रोफ़ाइल पूर्वावलोकन',
-  'profilePreviewDesc': 'आस-पास के ग्राहकों को आपकी सत्यापित प्रोफ़ाइल इस प्रकार दिखाई देती है।',
+
+  'scheduledBookings': 'Scheduled Bookings',
+
+  'bookedAndPending': 'Booked',
+
+  'lockedCannotCancel': 'Pickup से 1 घंटे पहले Cancel नहीं कर सकते',
+
+  'cancelReservation': 'Booking Cancel करें',
+
+  'cancelReservationConfirm':
+      'Booking Cancel करते ही यह Pickup किसी दूसरे Nearby Partner को भेज दिया जाएगा।',
+
+  'goOnlineToStart': 'Scheduled Pickup शुरू करने के लिए समय पर Online हो जाएं।',
+
+  'offlineWarning': 'Offline',
+
+  'verificationCenterTitle': 'Verification Center',
+
+  'recycleWithTrust': 'विश्वास के साथ Recycling करें',
+  'verificationBenefits': 'Verification के फायदे',
+
+  'verifiedBadgeBenefit':
+      'Verified Partner बनने पर ज्यादा Leads मिलने की संभावना',
+
+  'bulkLeadsBenefit': 'Bulk और Commercial Pickups मिलेंगे',
+
+  'fastSettlementsBenefit': 'तेज़ और सीधे Wallet Payment',
+
+  'aadhaarDesc': 'Aadhaar Verify होने से आपकी पहचान Confirm होती है।',
+
+  'businessDesc':
+      'Shop की जानकारी और GST (Optional) से Customer का भरोसा बढ़ता है।',
+
+  'paymentDesc': 'Verified Bank Account में Payment जल्दी मिलेगा।',
+
+  'locationDesc':
+      'सही Location से Nearby Customers तक आपकी Shop आसानी से पहुंचेगी।',
+
+  'verified': 'Verified',
+
+  'notVerified': 'Verify नहीं हुआ',
+
+  'underVerification': 'Verification चल रहा है',
+
+  'tapToVerify': 'Verify करने के लिए टैप करें',
+
+  'trustScoreDesc':
+      'अच्छा Trust Score होने पर ज्यादा और अच्छे Pickup मिलते हैं।',
+
+  'completionRateDesc':
+      'Accept किए गए Pickup पूरे करते रहें ताकि आपकी Rating अच्छी बनी रहे।',
+
+  'cancellationRateDesc': 'बार-बार Cancel करने से नए Pickup कम मिल सकते हैं।',
+
+  'profilePreview': 'Profile Preview',
+
+  'profilePreviewDesc': 'Nearby Customers को आपकी Profile ऐसे दिखाई देगी।',
 
   // Login Screen
-  'loginSubtitle': 'हम आपके नंबर पर एक सत्यापन कोड भेजेंगे',
-  'phoneRequired': 'फ़ोन नंबर आवश्यक है',
-  'phoneInvalid': '10 अंकों का नंबर दर्ज करें',
-  'agreePrefix': 'जारी रखकर, आप हमारी ',
-  'termsAndConditions': 'नियम व शर्तें',
+  'loginSubtitle': 'हम आपके मोबाइल नंबर पर OTP भेजेंगे।',
+
+  'phoneRequired': 'मोबाइल नंबर डालें',
+
+  'phoneInvalid': 'सही 10 अंकों का मोबाइल नंबर डालें',
+
+  'agreePrefix': 'आगे बढ़कर आप हमारी ',
+
+  'termsAndConditions': 'Terms & Conditions',
+
   'andText': ' और ',
-  'benefitEarn': 'प्रतिदिन ₹500–₹1500 कमाएं',
-  'benefitAccept': 'सेकंड में पिकअप स्वीकार करें',
-  'benefitSecure': 'सुरक्षित और सत्यापित ग्राहक',
+
+  'benefitEarn': 'रोज़ ₹500–₹1500 तक कमाएं',
+
+  'benefitAccept': 'कुछ सेकंड में Pickup Accept करें',
+
+  'benefitSecure': 'Verified Customers से Pickup पाएँ',
 
   // OTP Screen
-  'otpVerification': 'OTP सत्यापन',
-  'otpSentCodeTo': 'हमने 6 अंकों का कोड भेजा है',
+  'otpVerification': 'OTP Verify करें',
+
+  'otpSentCodeTo': '6 अंकों का OTP भेज दिया गया है',
+
   'wrongNumber': 'गलत नंबर?',
-  'enterCode': 'कोड दर्ज करें',
-  'verifiedLabel': 'सत्यापित!',
-  'otpResent': 'OTP पुनः भेजा गया!',
-  'verificationFailed': 'सत्यापन विफल',
-  'authFailed': 'प्रमाणीकरण विफल',
+
+  'enterCode': 'OTP डालें',
+
+  'verifiedLabel': 'Verify हो गया!',
+
+  'otpResent': 'OTP दोबारा भेज दिया गया',
+
+  'verificationFailed': 'Verification नहीं हो पाया',
+
+  'authFailed': 'Login नहीं हो पाया',
 
   // Earnings Screen
   'myEarnings': 'मेरी कमाई',
+
   'earnedPeriod': 'कमाई',
-  'pickupsDone': 'पिकअप पूरे',
-  'pickupDone': 'पिकअप पूरा',
+
+  'pickupsDone': 'Pickup पूरे',
+
+  'pickupDone': 'Pickup पूरा',
+
   'todayEarningsLabel': 'आज की कमाई',
-  'weekEarningsLabel': 'सप्ताह की कमाई',
-  'todayOrdersLabel': 'आज के ऑर्डर',
-  'weekOrdersLabel': 'सप्ताह के ऑर्डर',
-  'weekAtGlance': 'इस सप्ताह की झलक',
-  'weekly': 'साप्ताहिक',
-  'avgPerPickup': 'प्रति पिकअप औसत',
-  'totalPickups': 'कुल पिकअप',
-  'ordersText': 'ऑर्डर',
+
+  'weekEarningsLabel': 'इस हफ्ते की कमाई',
+
+  'todayOrdersLabel': 'आज के Orders',
+
+  'weekOrdersLabel': 'इस हफ्ते के Orders',
+
+  'weekAtGlance': 'इस हफ्ते का Summary',
+
+  'weekly': 'Weekly',
+
+  'avgPerPickup': 'औसत कमाई / Pickup',
+
+  'totalPickups': 'कुल Pickup',
+
+  'ordersText': 'Orders',
+
   'totalEarned': 'कुल कमाई',
-  'accountBlocked': 'खाता ब्लॉक – जारी रखने के लिए कमीशन का भुगतान करें',
-  'commissionPending': 'कमीशन भुगतान लंबित है',
-  'commissionClear': 'कोई कमीशन बकाया नहीं – सब ठीक है!',
-  'dueBalance': 'बकाया शेष',
-  'payNow': 'अभी भुगतान करें',
-  'clearText': 'साफ़',
-  'commissionRate': 'कमीशन दर',
-  'commissionRateValue': 'प्रत्येक पूर्ण ऑर्डर का 2%',
-  'payBy': 'भुगतान तिथि',
+
+  'accountBlocked':
+      'Commission बाकी है। Payment करने के बाद ही नए Pickup मिलेंगे।',
+
+  'commissionPending': 'Commission Payment बाकी है',
+
+  'commissionClear': 'कोई Commission बाकी नहीं है',
+
+  'dueBalance': 'बाकी Payment',
+
+  'payNow': 'अभी Pay करें',
+
+  'clearText': 'Clear',
+
+  'commissionRate': 'Commission',
+
+  'commissionRateValue': 'हर Completed Order का 2%',
+
+  'payBy': 'Payment की तारीख',
+
   'everyTuesday': 'हर मंगलवार',
-  'upiId': 'UPI आईडी',
-  'payViaUpi': '₹{amount} UPI से भुगतान करें',
-  'nothingToPay': 'कुछ भी भुगतान नहीं',
-  'alreadyPaidWhatsapp': 'पहले ही भुगतान किया? WhatsApp पर सूचित करें',
-  'noUpiApp': 'कोई UPI ऐप नहीं मिला। {upiId} पर भुगतान करें।',
-  'unableWhatsapp': 'WhatsApp खोलने में असमर्थ।',
-  'upiPaymentNote': 'भुगतान आपके UPI ऐप में खुलेगा। स्क्रैपवेल द्वारा सत्यापन के बाद बकाया शेष साफ़ किया जाएगा।',
-  
+
+  'upiId': 'UPI ID',
+
+  'payViaUpi': 'UPI से ₹{amount} Pay करें',
+
+  'nothingToPay': 'कोई Payment बाकी नहीं है',
+
+  'alreadyPaidWhatsapp': 'Payment कर दिया? WhatsApp पर बताएं',
+
+  'noUpiApp': 'कोई UPI App नहीं मिला। कृपया {upiId} पर Payment करें।',
+
+  'unableWhatsapp': 'WhatsApp नहीं खुल सका।',
+
+  'upiPaymentNote':
+      'Payment आपके UPI App में खुलेगा। Payment Verify होने के बाद आपका Balance Update कर दिया जाएगा।',
+
   // Home Screen Assignment Card & Alerts
-  'howOrdersAssigned': 'ऑर्डर कैसे सौंपे जाते हैं',
-  'instantPickupsTitle': 'त्वरित पिकअप (Instant)',
-  'instantPickupsDesc': 'ऑनलाइन + जीपीएस चालू। आपके लाइव स्थान, त्रिज्या, उपलब्धता और स्क्रैप श्रेणी द्वारा फिल्टर किए जाते हैं।',
-  'scheduledPickupsTitle': 'अनुसूचित पिकअप (Scheduled)',
-  'scheduledPickupsDesc': 'कार्य समय और स्लॉट उपलब्धता द्वारा आरक्षित किए जा सकते हैं। आरक्षित बुकिंग शुरू करने के लिए जीपीएस ऑनलाइन होना आवश्यक नहीं है।',
-  'commissionPaymentRequired': 'कमीशन भुगतान आवश्यक है',
-  'commissionDueTitle': 'कमीशन देय है',
-  'payCommissionToReceive': 'आगे के ऑर्डर प्राप्त करने के लिए स्क्रैपवेल को ₹{amount} कमीशन का भुगतान करें। {dueText}।',
-  'payButton': 'भुगतान करें',
-  'iPaidButton': 'मैंने भुगतान कर दिया',
-  'locationAccessRequired': 'स्थान अनुमति आवश्यक है',
-  'locationDisabledDescription': 'स्थान पहुंच (GPS) अक्षम है। ऑर्डर प्राप्त करने के लिए कृपया स्थान सक्षम करें।',
-  'enableLocationButton': 'स्थान सक्षम करें',
-  'instantActiveGps': 'लाइव जीपीएस के साथ त्वरित पिकअप सक्रिय हैं।',
-  'goOnlineGpsOn': 'त्वरित पिकअप के लिए जीपीएस चालू होने पर ही ऑनलाइन जाएं।',
+  'howOrdersAssigned': 'Pickup कैसे मिलता है?',
 
-  // Cancellation reasons (order tracking)
-  'cancelReasonVehicle': 'वाहन खराब',
-  'cancelReasonCustomer': 'ग्राहक उपलब्ध नहीं / जवाब नहीं दे रहा',
-  'cancelReasonNegotiation': 'बातचीत विफल / गलत दर चयन',
-  'cancelReasonEmergency': 'आपातकाल / व्यक्तिगत कारण',
-  'cancelReasonOther': 'अन्य',
-  'orderCancelledSuccess': 'ऑर्डर सफलतापूर्वक रद्द किया गया।',
-  'cannotCancelAfterPickup': 'पिकअप शुरू होने के बाद इस ऑर्डर को रद्द नहीं किया जा सकता।',
-  'failedToCancelOrder': 'ऑर्डर रद्द करने में विफल।',
+  'instantPickupsTitle': 'Instant Pickup',
+
+  'instantPickupsDesc':
+      'Online रहें और GPS ON रखें। आपके Location, Distance, Scrap Category और Availability के हिसाब से Pickup भेजा जाता है।',
+
+  'scheduledPickupsTitle': 'Scheduled Pickup',
+
+  'scheduledPickupsDesc':
+      'Scheduled Pickup पहले से Reserve किया जा सकता है। समय आने पर Online होकर Pickup शुरू करें।',
+
+  'commissionPaymentRequired': 'Commission Payment ज़रूरी है',
+
+  'commissionDueTitle': 'Commission बाकी है',
+
+  'payCommissionToReceive':
+      'नए Pickup पाने के लिए ₹{amount} Commission Pay करें। {dueText}',
+
+  'payButton': 'Pay करें',
+
+  'iPaidButton': 'मैंने Payment कर दिया',
+
+  'locationAccessRequired': 'Location Permission चाहिए',
+
+  'locationDisabledDescription':
+      'GPS OFF है। नए Pickup पाने के लिए Location ON करें।',
+
+  'enableLocationButton': 'Location ON करें',
+
+  'instantActiveGps': 'GPS ON है। अब आपको Instant Pickup मिलेंगे।',
+
+  'goOnlineGpsOn': 'Instant Pickup पाने के लिए GPS ON करके Online जाएं।',
+
+  // Cancellation Reasons
+  'cancelReasonVehicle': 'Vehicle खराब हो गया',
+
+  'cancelReasonCustomer': 'Customer उपलब्ध नहीं है',
+
+  'cancelReasonNegotiation': 'Price पर बात नहीं बनी',
+
+  'cancelReasonEmergency': 'Emergency / Personal कारण',
+
+  'cancelReasonOther': 'Other',
+
+  'orderCancelledSuccess': 'Order Cancel कर दिया गया।',
+
+  'cannotCancelAfterPickup':
+      'Pickup शुरू होने के बाद Order Cancel नहीं कर सकते।',
+  'failedToCancelOrder': 'Order Cancel नहीं हो पाया।',
+
+  // Commission Blocked Dialog
+  'ordersPaused': 'नए Orders आना बंद हैं',
+  'clearCommissionInstructions':
+      'नए Orders पाने के लिए ₹{amount} का बाकी कमीशन पे करें।',
+  'payCommission': 'कमीशन पे करें',
+  'iPaidNotify': 'मैंने पे कर दिया, Scrapwell को बताएं',
+
+  /// Lead Details & Tip
+  'locationLabel': 'Pickup Address',
+  'distanceLabel': 'आपसे दूरी',
+  'payoutToCustomer': 'Customer को मिलने वाला Payment',
+  'extraTipForYou': '🎉 आपके लिए Extra Tip',
+  'pickupSlotLabel': 'Pickup Time',
 };
-

@@ -1,7 +1,7 @@
 name: scrapwell_partner
 description: "Scrapwell Partner - Scrap shop owner app for receiving and managing pickup leads"
 publish_to: 'none'
-version: 1.0.0+2
+version: 1.0.0+6
 environment:
   sdk: ^3.7.2
 
@@ -13,7 +13,6 @@ dependencies:
 
   # UI & Design
   google_fonts: ^6.3.2
-  gap: ^3.0.1
   smooth_page_indicator: ^2.0.1
   pinput: ^6.0.2
   shimmer: ^3.0.0
@@ -29,7 +28,6 @@ dependencies:
   # Location & Maps
   geolocator: ^14.0.2
   geocoding: ^4.0.0
-  google_maps_flutter: ^2.10.0
 
   # State & Persistence
   shared_preferences: ^2.3.3
@@ -41,15 +39,11 @@ dependencies:
   url_launcher: ^6.3.2
   intl: ^0.19.0
   http: ^1.2.2
-  geoflutterfire_plus: ^0.0.34
   flutter_local_notifications: ^19.5.0
   cupertino_icons: ^1.0.8
-  flutter_image_compress: ^2.4.0
-  crypto: ^3.0.7
   audioplayers: ^6.0.0
-
 dependency_overrides:
-  vector_math: ^2.3.0
+  vector_math: 2.3.0
 
 dev_dependencies:
   flutter_test:

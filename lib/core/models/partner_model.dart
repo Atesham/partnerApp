@@ -423,7 +423,7 @@ class PartnerModel {
       commissionDueAt != null &&
       DateTime.now().isAfter(commissionDueAt!);
   bool get shouldBlockForCommission =>
-      commissionBlocked || isCommissionOverLimit || isCommissionOverdue;
+      hasCommissionDue && (commissionBlocked || isCommissionOverLimit || isCommissionOverdue);
   String get displayName => fullName.isNotEmpty ? fullName : 'Partner';
   String get initials {
     final parts = fullName.trim().split(' ');

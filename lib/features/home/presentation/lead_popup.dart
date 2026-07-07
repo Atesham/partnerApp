@@ -9,7 +9,9 @@ import '../../../core/models/order_model.dart';
 import '../../../core/models/partner_model.dart';
 import '../../../core/services/lead_service.dart';
 import '../../../core/utils/location_utils.dart';
+import '../../../core/utils/log_utils.dart';
 import '../../orders/presentation/order_tracking_screen.dart';
+import '../../../core/l10n/app_localizations.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 
@@ -105,7 +107,7 @@ class _LeadPopupState extends State<LeadPopup>
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.play(AssetSource('ringtone/crisp-fast-two-sec-1-1782943688959_ogLriGsj.wav'));
     } catch (e) {
-      debugPrint('Error playing lead popup ringtone: $e');
+      debugLog('Error playing lead popup ringtone: $e');
     }
   }
 
@@ -282,29 +284,34 @@ class _LeadPopupState extends State<LeadPopup>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Location
-                      _detailRow(Icons.location_on_rounded, 'Location', widget.order.customerAddress, AppTheme.error),
+                      _detailRow(Icons.location_on_rounded, context.t('locationLabel'), widget.order.customerAddress, AppTheme.error),
                       const SizedBox(height: 12),
                       // Distance
                       _detailRow(
                         Icons.social_distance_rounded,
-                        'Distance',
+                        context.t('distanceLabel'),
                         '~${LocationUtils.calculateDistance(
                           widget.partner.currentLat != 0.0 ? widget.partner.currentLat : widget.partner.shopLat,
                           widget.partner.currentLng != 0.0 ? widget.partner.currentLng : widget.partner.shopLng,
                           widget.order.customerLat,
                           widget.order.customerLng,
-                        ).toStringAsFixed(1)} km from your location',
+                        ).toStringAsFixed(1)} km',
                         AppTheme.info,
                       ),
                       const SizedBox(height: 12),
-                      // Estimated value
-                      _detailRow(Icons.payments_rounded, 'Estimated Value', '₹${widget.order.estimatedPayout.toStringAsFixed(0)}', AppTheme.primary),
+                      // Estimated value (Payout to Customer)
+                      _detailRow(Icons.payments_rounded, context.t('payoutToCustomer'), '₹${widget.order.estimatedPayout.toStringAsFixed(0)}', AppTheme.primary),
                       const SizedBox(height: 12),
+                      // Extra Tip for You
+                      if (widget.order.tipAmount > 0) ...[
+                        _tipRow(context.t('extraTipForYou'), '₹${widget.order.tipAmount.toStringAsFixed(0)}'),
+                        const SizedBox(height: 12),
+                      ],
                       // Weight
-                      _detailRow(Icons.scale_rounded, 'Approx Weight', '~${widget.order.totalEstimatedWeight.toStringAsFixed(0)} kg', AppTheme.warning),
+                      _detailRow(Icons.scale_rounded, context.t('approxWeight'), '~${widget.order.totalEstimatedWeight.toStringAsFixed(0)} kg', AppTheme.warning),
                       const SizedBox(height: 12),
                       // Slot
-                      _detailRow(Icons.schedule_rounded, 'Pickup Slot', widget.order.pickupSlot, AppTheme.textSecondary),
+                      _detailRow(Icons.schedule_rounded, context.t('pickupSlotLabel'), widget.order.pickupSlot, AppTheme.textSecondary),
 
                       const SizedBox(height: 14),
 
@@ -478,6 +485,70 @@ class _LeadPopupState extends State<LeadPopup>
           ]),
         ),
       ],
+    );
+  }
+
+  Widget _tipRow(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD1FAE5), // Green-100 background
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)), // Green-500 border
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981), // Emerald-500 background
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.star_rounded, color: Colors.white, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF065F46), // Emerald-800 text
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF065F46), // Emerald-800 text
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF047857), // Emerald-700
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'EXTRA EARNING',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

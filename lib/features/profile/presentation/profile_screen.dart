@@ -12,8 +12,8 @@ import '../../compliance/presentation/safety_center_screen.dart';
 import '../../compliance/presentation/privacy_center_screen.dart';
 import '../../compliance/presentation/legal_hub_screen.dart';
 import '../../compliance/presentation/about_scrapwell_screen.dart';
-
 import '../../earnings/presentation/earnings_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -31,164 +31,194 @@ class ProfileScreen extends StatelessWidget {
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
-      backgroundColor: AppTheme.background,
-      body: ListenableBuilder(
-        listenable: partner,
-        builder: (_, __) {
-          return CustomScrollView(
-            slivers: [
-              _buildHeader(context, partner),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      // Partner card
-                      _buildPartnerCard(context, partner),
-                      const SizedBox(height: 20),
-                      
-                      // Section 1: Business & Settlements
-                      _buildSection(context.t('businessRelationship'), [
-                        _MenuItem(
-                          Icons.business_center_rounded,
-                          context.t('myBusinessProfile'),
-                          AppTheme.primary,
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const BusinessProfileScreen()),
-                          ),
-                        ),
-                        _MenuItem(
-                          Icons.payments_rounded,
-                          context.t('earningsSettlements'),
-                          AppTheme.success,
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const EarningsScreen()),
-                          ),
-                        ),
-                      ]),
-                      const SizedBox(height: 16),
+        backgroundColor: AppTheme.background,
+        body: ListenableBuilder(
+          listenable: partner,
+          builder: (_, __) {
+            return CustomScrollView(
+              slivers: [
+                _buildHeader(context, partner),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        // Partner card
+                        _buildPartnerCard(context, partner),
+                        const SizedBox(height: 20),
 
-                      // Section 2: Safety & Support
-                      _buildSection(context.t('safetyOperations'), [
-                        _MenuItem(
-                          Icons.security_rounded,
-                          context.t('safetyCenter'),
-                          AppTheme.error,
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const SafetyCenterScreen()),
-                          ),
-                        ),
-                        _MenuItem(
-                          Icons.support_agent_rounded,
-                          context.t('helpSupport'),
-                          AppTheme.info,
-                          () => _launchWhatsAppSupport(context),
-                        ),
-                      ]),
-                      const SizedBox(height: 16),
-
-                      // Section 3: Privacy, Legal & About
-                      _buildSection(context.t('privacyCompliance'), [
-                        _MenuItem(
-                          Icons.lock_rounded,
-                          context.t('privacyData'),
-                          AppTheme.warning,
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const PrivacyCenterScreen()),
-                          ),
-                        ),
-                        _MenuItem(
-                          Icons.gavel_rounded,
-                          context.t('legalCompliance'),
-                          AppTheme.textSecondary,
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const LegalHubScreen()),
-                          ),
-                        ),
-                        _MenuItem(
-                          Icons.info_outline_rounded,
-                          context.t('aboutScrapwell'),
-                          AppTheme.textSecondary,
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AboutScrapwellScreen()),
-                          ),
-                        ),
-                      ]),
-                      const SizedBox(height: 16),
-
-                      // Section 4: Preferences
-                      _buildSection(context.t('language'), [
-                        _MenuItem(
-                          Icons.language_rounded,
-                          context.t('language'),
-                          AppTheme.primary,
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const LanguageSelectionScreen()),
-                          ),
-                        ),
-                      ]),
-                      const SizedBox(height: 24),
-
-                      // Logout Button
-                      GestureDetector(
-                        onTap: () => _showLogoutDialog(context, partner),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: AppTheme.subtleShadow,
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.logout_rounded, color: AppTheme.error, size: 22),
-                              const SizedBox(width: 14),
-                              Text(
-                                context.t('logout'),
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.error,
-                                ),
+                        // Section 1: Business & Settlements
+                        _buildSection(context.t('businessRelationship'), [
+                          _MenuItem(
+                            Icons.business_center_rounded,
+                            context.t('myBusinessProfile'),
+                            AppTheme.primary,
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const BusinessProfileScreen(),
                               ),
-                              const Spacer(),
-                              const Icon(Icons.chevron_right_rounded, color: AppTheme.error, size: 20),
-                            ],
+                            ),
+                          ),
+                          _MenuItem(
+                            Icons.payments_rounded,
+                            context.t('earningsSettlements'),
+                            AppTheme.success,
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const EarningsScreen(),
+                              ),
+                            ),
+                          ),
+                        ]),
+                        const SizedBox(height: 16),
+
+                        // Section 2: Safety & Support
+                        _buildSection(context.t('safetyOperations'), [
+                          _MenuItem(
+                            Icons.security_rounded,
+                            context.t('safetyCenter'),
+                            AppTheme.error,
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SafetyCenterScreen(),
+                              ),
+                            ),
+                          ),
+                          _MenuItem(
+                            Icons.support_agent_rounded,
+                            context.t('helpSupport'),
+                            AppTheme.info,
+                            () => _launchWhatsAppSupport(context),
+                          ),
+                        ]),
+                        const SizedBox(height: 16),
+
+                        // Section 3: Privacy, Legal & About
+                        _buildSection(context.t('privacyCompliance'), [
+                          _MenuItem(
+                            Icons.lock_rounded,
+                            context.t('privacyData'),
+                            AppTheme.warning,
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PrivacyCenterScreen(),
+                              ),
+                            ),
+                          ),
+                          _MenuItem(
+                            Icons.gavel_rounded,
+                            context.t('legalCompliance'),
+                            AppTheme.textSecondary,
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const LegalHubScreen(),
+                              ),
+                            ),
+                          ),
+                          _MenuItem(
+                            Icons.info_outline_rounded,
+                            context.t('aboutScrapwell'),
+                            AppTheme.textSecondary,
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AboutScrapwellScreen(),
+                              ),
+                            ),
+                          ),
+                        ]),
+                        const SizedBox(height: 16),
+
+                        // Section 4: Preferences
+                        _buildSection(context.t('language'), [
+                          _MenuItem(
+                            Icons.language_rounded,
+                            context.t('language'),
+                            AppTheme.primary,
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const LanguageSelectionScreen(),
+                              ),
+                            ),
+                          ),
+                        ]),
+                        const SizedBox(height: 24),
+
+                        // Logout Button
+                        GestureDetector(
+                          onTap: () => _showLogoutDialog(context, partner),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: AppTheme.subtleShadow,
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.logout_rounded,
+                                  color: AppTheme.error,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 14),
+                                Text(
+                                  context.t('logout'),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.error,
+                                  ),
+                                ),
+                                const Spacer(),
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: AppTheme.error,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                      Text(
-                        'Scrapwell Partner v1.0.0',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textHint),
-                      ),
-                      const SizedBox(height: 80),
-                    ],
+                        const SizedBox(height: 32),
+                        Text(
+                          'Scrapwell Partner v1.0.0',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textHint,
+                          ),
+                        ),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
-    ),
     );
   }
 
   Future<void> _launchWhatsAppSupport(BuildContext context) async {
     final isHindi = Localizations.localeOf(context).languageCode == 'hi';
     const text = 'Hi Scrapwell Support, I am a partner and need assistance.';
-    final whatsappUri = Uri.parse('whatsapp://send?phone=+918744081962&text=${Uri.encodeComponent(text)}');
-    
+    final whatsappUri = Uri.parse(
+      'whatsapp://send?phone=+918744081962&text=${Uri.encodeComponent(text)}',
+    );
+
     try {
-      final launched = await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+      final launched = await launchUrl(
+        whatsappUri,
+        mode: LaunchMode.externalApplication,
+      );
       if (!launched) {
         throw 'Could not launch WhatsApp';
       }
@@ -203,77 +233,118 @@ class ProfileScreen extends StatelessWidget {
   void _showSupportFallbackDialog(BuildContext context, bool isHindi) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            const Icon(Icons.support_agent_rounded, color: AppTheme.primary, size: 28),
-            const SizedBox(width: 10),
-            Text(
-              isHindi ? 'सहायता केंद्र' : 'Support Desk',
-              style: const TextStyle(fontWeight: FontWeight.w800),
+      builder:
+          (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
             ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isHindi
-                  ? 'आपके डिवाइस पर व्हाट्सएप इंस्टॉल नहीं है। कृपया हमसे सीधे संपर्क करें:'
-                  : 'WhatsApp app is not installed on your device. Please connect with us directly:',
-              style: const TextStyle(fontSize: 14, height: 1.4, color: AppTheme.textPrimary),
+            title: Row(
+              children: [
+                const Icon(
+                  Icons.support_agent_rounded,
+                  color: AppTheme.primary,
+                  size: 28,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  isHindi ? 'सहायता केंद्र' : 'Support Desk',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.background,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.border),
-              ),
-              child: Column(
-                children: [
-                  // Call option
-                  ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.phone_rounded, color: AppTheme.primary),
-                    title: const Text('+91 8744081962', style: TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(isHindi ? 'कॉल करने के लिए टैप करें' : 'Tap to call directly'),
-                    onTap: () async {
-                      final uri = Uri.parse('tel:+918744081962');
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    },
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isHindi
+                      ? 'आपके डिवाइस पर व्हाट्सएप इंस्टॉल नहीं है। कृपया हमसे सीधे संपर्क करें:'
+                      : 'WhatsApp app is not installed on your device. Please connect with us directly:',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: AppTheme.textPrimary,
                   ),
-                  const Divider(height: 1, color: AppTheme.divider),
-                  // Email option
-                  ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.email_rounded, color: AppTheme.primary),
-                    title: const Text('support@scrapwell.in', style: TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(isHindi ? 'ईमेल भेजने के लिए टैप करें' : 'Tap to email directly'),
-                    onTap: () async {
-                      final uri = Uri.parse('mailto:support@scrapwell.in?subject=Partner%20Support%20Assistance');
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    },
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.border),
                   ),
-                ],
+                  child: Column(
+                    children: [
+                      // Call option
+                      ListTile(
+                        dense: true,
+                        leading: const Icon(
+                          Icons.phone_rounded,
+                          color: AppTheme.primary,
+                        ),
+                        title: const Text(
+                          '+91 8744081962',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          isHindi
+                              ? 'कॉल करने के लिए टैप करें'
+                              : 'Tap to call directly',
+                        ),
+                        onTap: () async {
+                          final uri = Uri.parse('tel:+918744081962');
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        },
+                      ),
+                      const Divider(height: 1, color: AppTheme.divider),
+                      // Email option
+                      ListTile(
+                        dense: true,
+                        leading: const Icon(
+                          Icons.email_rounded,
+                          color: AppTheme.primary,
+                        ),
+                        title: const Text(
+                          'support@scrapwell.in',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          isHindi
+                              ? 'ईमेल भेजने के लिए टैप करें'
+                              : 'Tap to email directly',
+                        ),
+                        onTap: () async {
+                          final uri = Uri.parse(
+                            'mailto:support@scrapwell.in?subject=Partner%20Support%20Assistance',
+                          );
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(isHindi ? 'ठीक है' : 'Close'),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 44),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Text(isHindi ? 'ठीक है' : 'Close'),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -316,17 +387,27 @@ class ProfileScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
+              image:
+                  p.profilePhotoUrl.isNotEmpty
+                      ? DecorationImage(
+                        image: CachedNetworkImageProvider(p.profilePhotoUrl),
+                        fit: BoxFit.cover,
+                      )
+                      : null,
             ),
-            child: Center(
-              child: Text(
-                p.initials,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 24,
-                ),
-              ),
-            ),
+            child:
+                p.profilePhotoUrl.isEmpty
+                    ? Center(
+                      child: Text(
+                        p.initials,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 24,
+                        ),
+                      ),
+                    )
+                    : null,
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -351,7 +432,10 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(p.phone, style: const TextStyle(color: Colors.white60, fontSize: 13)),
+                Text(
+                  p.phone,
+                  style: const TextStyle(color: Colors.white60, fontSize: 13),
+                ),
               ],
             ),
           ),
@@ -359,15 +443,21 @@ class ProfileScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
-                  color: p.isApproved
-                      ? Colors.white.withOpacity(0.2)
-                      : Colors.orangeAccent.withOpacity(0.3),
+                  color:
+                      p.isApproved
+                          ? Colors.white.withOpacity(0.2)
+                          : Colors.orangeAccent.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  p.isApproved ? '✓ ${context.t('approved')}' : '⏳ ${context.t('pending')}',
+                  p.isApproved
+                      ? '✓ ${context.t('approved')}'
+                      : '⏳ ${context.t('pending')}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -448,10 +538,17 @@ class ProfileScreen extends StatelessWidget {
                       color: AppTheme.textSecondary,
                       size: 20,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
                   ),
                   if (i < items.length - 1)
-                    const Divider(height: 1, indent: 64, color: AppTheme.divider),
+                    const Divider(
+                      height: 1,
+                      indent: 64,
+                      color: AppTheme.divider,
+                    ),
                 ],
               );
             }),
@@ -464,45 +561,62 @@ class ProfileScreen extends StatelessWidget {
   void _showLogoutDialog(BuildContext context, PartnerProvider partner) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(context.t('logoutConfirm')),
-        content: Text(
-          context.t('logoutConfirm'),
-          style: const TextStyle(color: AppTheme.textSecondary, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              context.t('cancel'),
-              style: const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w700),
+      builder:
+          (_) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await partner.toggleOnline(false);
-              partner.reset();
-              await AuthService.instance.signOut();
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  (_) => false,
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.error,
-              minimumSize: Size.zero,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: Text(context.t('logoutConfirm')),
+            content: Text(
+              context.t('logoutConfirm'),
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                height: 1.5,
+              ),
             ),
-            child: Text(context.t('logout'), style: const TextStyle(fontWeight: FontWeight.w700)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  context.t('cancel'),
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await partner.toggleOnline(false);
+                  partner.reset();
+                  await AuthService.instance.signOut();
+                  if (context.mounted) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (_) => false,
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.error,
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  context.t('logout'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 }

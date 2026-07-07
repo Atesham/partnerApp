@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../constants/supabase_constants.dart';
+import '../utils/log_utils.dart';
 
 class SupabaseStorageService {
   static const String bucketName = 'kabadi_bookings';
@@ -34,7 +35,7 @@ class SupabaseStorageService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return 'https://$projectId.supabase.co/storage/v1/object/public/$bucketName/$fileName';
       } else {
-        debugPrint(
+        debugLog(
           '❌ Supabase Upload Error: ${response.statusCode} - ${response.body}',
         );
         throw Exception(
@@ -42,7 +43,7 @@ class SupabaseStorageService {
         );
       }
     } catch (e) {
-      debugPrint(
+      debugLog(
         '⚠️ Supabase upload exception: $e. Falling back to default mockup image to not block partner.',
       );
       return 'https://images.unsplash.com/photo-1611284446314-60a58ac0deb9?auto=format&fit=crop&w=800&q=80';

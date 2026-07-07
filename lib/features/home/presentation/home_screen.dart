@@ -33,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription<List<OrderModel>>? _leadsSub;
   List<OrderModel> _nearbyOrders = [];
   bool _isLeadsLoading = true;
-  final Set<String> _declinedOrderIds = {};
+  final Map<String, double> _declinedOrderTipAmounts = {};
 
   @override
   void initState() {
@@ -45,13 +45,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _earnings.loadEarnings();
     _earnings.listenToWallet();
     _partner.refreshLocationAvailability();
-    
-    // Register standard ChangeNotifier listeners. Direct listeners are much more robust 
+
+    // Register standard ChangeNotifier listeners. Direct listeners are much more robust
     // than top-level ListenableBuilders for complex scroll view structures.
     _partner.addListener(_handlePartnerChange);
     _earnings.addListener(_onProviderUpdate);
     _orders.addListener(_onProviderUpdate);
-    
+
     _listenToLeads();
 
     // Start scheduled order auto-assign listener once partner data is ready.
@@ -117,11 +117,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           (orders) {
             if (!mounted) return;
 
-            // Filter out declined/ignored orders
+            // Filter out declined/ignored orders, except if the tip amount has increased
             final visibleOrders =
-                orders
-                    .where((o) => !_declinedOrderIds.contains(o.orderId))
-                    .toList();
+                orders.where((o) {
+                  if (_declinedOrderTipAmounts.containsKey(o.orderId)) {
+                    final declinedTip =
+                        _declinedOrderTipAmounts[o.orderId] ?? 0.0;
+                    return o.tipAmount > declinedTip;
+                  }
+                  return true;
+                }).toList();
 
             setState(() {
               _nearbyOrders = visibleOrders;
@@ -180,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             onAccepted: () => setState(() => _leadPopupShown = false),
             onDeclined:
                 () => setState(() {
-                  _declinedOrderIds.add(order.orderId);
+                  _declinedOrderTipAmounts[order.orderId] = order.tipAmount;
                   _nearbyOrders.removeWhere((o) => o.orderId == order.orderId);
                   _incomingOrder = null;
                   _leadPopupShown = false;
@@ -389,14 +394,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       backgroundColor: AppTheme.error,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     child: Text(
                       context.t('enableLocationButton'),
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -561,11 +574,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildCommissionDueCard() {
     final dueAt = _earnings.commissionDueAt;
-    final dueText = dueAt == null
-        ? context.t('everyTuesday')
-        : 'due by ${dueAt.day}/${dueAt.month}/${dueAt.year}';
-    final blocked = _partner.isCommissionBlocked ||
-        _earnings.shouldBlockForCommission;
+    final dueText =
+        dueAt == null
+            ? context.t('everyTuesday')
+            : 'due by ${dueAt.day}/${dueAt.month}/${dueAt.year}';
+    final blocked =
+        _partner.isCommissionBlocked || _earnings.shouldBlockForCommission;
 
     final balanceText = _earnings.commissionDueBalance.toStringAsFixed(0);
 
@@ -577,9 +591,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         color: blocked ? const Color(0xFFFEF2F2) : const Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: blocked
-              ? AppTheme.error.withOpacity(0.35)
-              : AppTheme.warning.withOpacity(0.35),
+          color:
+              blocked
+                  ? AppTheme.error.withOpacity(0.35)
+                  : AppTheme.warning.withOpacity(0.35),
         ),
       ),
       child: Column(
@@ -601,8 +616,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      blocked 
-                          ? context.t('commissionPaymentRequired') 
+                      blocked
+                          ? context.t('commissionPaymentRequired')
                           : context.t('commissionDueTitle'),
                       style: TextStyle(
                         fontSize: 14,
@@ -612,7 +627,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      context.t('payCommissionToReceive')
+                      context
+                          .t('payCommissionToReceive')
                           .replaceAll('{amount}', balanceText)
                           .replaceAll('{dueText}', dueText),
                       style: const TextStyle(
@@ -633,24 +649,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             children: [
               TextButton.icon(
                 onPressed: _confirmCommissionOnWhatsApp,
-                icon: const Icon(Icons.chat_rounded, size: 16, color: AppTheme.primary),
+                icon: const Icon(
+                  Icons.chat_rounded,
+                  size: 16,
+                  color: AppTheme.primary,
+                ),
                 label: Text(
                   context.t('iPaidButton'),
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppTheme.primary),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: AppTheme.primary,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
               ElevatedButton.icon(
                 onPressed: _payCommission,
-                icon: const Icon(Icons.payment_rounded, size: 16, color: Colors.white),
+                icon: const Icon(
+                  Icons.payment_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
                 label: Text(
                   context.t('payButton'),
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: Colors.white,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
                   minimumSize: const Size(0, 40),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -909,7 +944,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   onAccept: () => _showLeadPopup(order),
                   onIgnore: () {
                     setState(() {
-                      _declinedOrderIds.add(order.orderId);
+                      _declinedOrderTipAmounts[order.orderId] = order.tipAmount;
                       _nearbyOrders.removeWhere(
                         (o) => o.orderId == order.orderId,
                       );
@@ -936,9 +971,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           const Icon(Icons.payments_rounded, size: 42, color: AppTheme.error),
           const SizedBox(height: 12),
-          const Text(
-            'Orders are paused',
-            style: TextStyle(
+          Text(
+            context.t('ordersPaused'),
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
               color: AppTheme.textPrimary,
@@ -946,7 +981,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 6),
           Text(
-            'Clear pending commission of Rs ${_earnings.commissionDueBalance.toStringAsFixed(0)} to receive further orders.',
+            context
+                .t('clearCommissionInstructions')
+                .replaceAll(
+                  '{amount}',
+                  _earnings.commissionDueBalance.toStringAsFixed(0),
+                ),
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 13,
@@ -965,12 +1005,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text('Pay Commission'),
+            child: Text(context.t('payCommission')),
           ),
           TextButton.icon(
             onPressed: _confirmCommissionOnWhatsApp,
             icon: const Icon(Icons.chat_rounded, size: 16),
-            label: const Text('I paid, notify Scrapwell'),
+            label: Text(context.t('iPaidNotify')),
           ),
         ],
       ),
@@ -1153,15 +1193,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     String _countdownLabel() {
       final now = DateTime.now();
       final slot = order.scheduledDateTime;
-      final isToday = slot.year == now.year && slot.month == now.month && slot.day == now.day;
-      final isTomorrow = slot.difference(DateTime(now.year, now.month, now.day)).inDays == 1;
-      final hour = slot.hour > 12 ? slot.hour - 12 : (slot.hour == 0 ? 12 : slot.hour);
+      final isToday =
+          slot.year == now.year &&
+          slot.month == now.month &&
+          slot.day == now.day;
+      final isTomorrow =
+          slot.difference(DateTime(now.year, now.month, now.day)).inDays == 1;
+      final hour =
+          slot.hour > 12 ? slot.hour - 12 : (slot.hour == 0 ? 12 : slot.hour);
       final ampm = slot.hour >= 12 ? 'PM' : 'AM';
       final min = slot.minute.toString().padLeft(2, '0');
       final timeStr = '${hour.toString().padLeft(2, '0')}:$min $ampm';
       if (isToday) return '${context.t('pickupToday')} at $timeStr';
       if (isTomorrow) return '${context.t('pickupTomorrow')} at $timeStr';
-      return '${slot.day} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][slot.month-1]} at $timeStr';
+      return '${slot.day} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][slot.month - 1]} at $timeStr';
     }
 
     String _diffLabel() {
@@ -1187,7 +1232,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: AppTheme.subtleShadow,
-          border: Border.all(color: const Color(0xFFFDBA74).withOpacity(0.5), width: 1.5),
+          border: Border.all(
+            color: const Color(0xFFFDBA74).withOpacity(0.5),
+            width: 1.5,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1198,35 +1246,90 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
-                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(18), topRight: Radius.circular(18)),
+                  topLeft: Radius.circular(18),
+                  topRight: Radius.circular(18),
+                ),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEA580C).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFEA580C).withOpacity(0.3)),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.calendar_today_rounded, size: 11, color: Color(0xFFEA580C)),
-                      const SizedBox(width: 5),
-                      Text(
-                        context.t('bookedAndPending'),
-                        style: const TextStyle(color: Color(0xFFEA580C), fontWeight: FontWeight.w800, fontSize: 11),
+                      border: Border.all(
+                        color: const Color(0xFFEA580C).withOpacity(0.3),
                       ),
-                    ]),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_rounded,
+                          size: 11,
+                          color: Color(0xFFEA580C),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          context.t('bookedAndPending'),
+                          style: const TextStyle(
+                            color: Color(0xFFEA580C),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const Spacer(),
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text('₹${order.estimatedPayout.toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.primary)),
-                    Text('estimated', style: TextStyle(fontSize: 10, color: AppTheme.textSecondary.withOpacity(0.7))),
-                  ]),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '₹${order.estimatedPayout.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                      Text(
+                        'estimated',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      if (order.tipAmount > 0) ...[
+                        const SizedBox(height: 3),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD1FAE5),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '+₹${order.tipAmount.toStringAsFixed(0)} Tip',
+                            style: const TextStyle(
+                              color: Color(0xFF047857),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -1237,59 +1340,88 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
                   // Countdown chip + time
-                  Row(children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: diff.inMinutes < 60
-                            ? const Color(0xFFFEF2F2)
-                            : const Color(0xFFF0FDF4),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(
-                          Icons.schedule_rounded,
-                          size: 13,
-                          color: diff.inMinutes < 60 ? AppTheme.error : AppTheme.primary,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
                         ),
-                        const SizedBox(width: 5),
-                        Text(
-                          _diffLabel(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: diff.inMinutes < 60 ? AppTheme.error : AppTheme.primary,
+                        decoration: BoxDecoration(
+                          color:
+                              diff.inMinutes < 60
+                                  ? const Color(0xFFFEF2F2)
+                                  : const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.schedule_rounded,
+                              size: 13,
+                              color:
+                                  diff.inMinutes < 60
+                                      ? AppTheme.error
+                                      : AppTheme.primary,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              _diffLabel(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color:
+                                    diff.inMinutes < 60
+                                        ? AppTheme.error
+                                        : AppTheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _countdownLabel(),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ]),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _countdownLabel(),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ]),
+                    ],
+                  ),
 
                   const SizedBox(height: 12),
 
                   // Address
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Icon(Icons.location_on_rounded, size: 16, color: AppTheme.error),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        order.customerAddress,
-                        style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.location_on_rounded,
+                        size: 16,
+                        color: AppTheme.error,
                       ),
-                    ),
-                  ]),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          order.customerAddress,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
 
                   const SizedBox(height: 10),
 
@@ -1300,12 +1432,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       children: [
                         _buildMetadataBadge(
                           Icons.social_distance_rounded,
-                          '~${LocationUtils.calculateDistance(
-                            _partner.partner.currentLat != 0.0 ? _partner.partner.currentLat : _partner.partner.shopLat,
-                            _partner.partner.currentLng != 0.0 ? _partner.partner.currentLng : _partner.partner.shopLng,
-                            order.customerLat,
-                            order.customerLng,
-                          ).toStringAsFixed(1)} km',
+                          '~${LocationUtils.calculateDistance(_partner.partner.currentLat != 0.0 ? _partner.partner.currentLat : _partner.partner.shopLat, _partner.partner.currentLng != 0.0 ? _partner.partner.currentLng : _partner.partner.shopLng, order.customerLat, order.customerLng).toStringAsFixed(1)} km',
                           AppTheme.info,
                         ),
                         const SizedBox(width: 8),
@@ -1320,6 +1447,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           '${order.scrapItems.isNotEmpty ? order.scrapItems.length : order.rawScrapCategories.length} items',
                           AppTheme.primary,
                         ),
+                        if (order.tipAmount > 0) ...[
+                          const SizedBox(width: 8),
+                          _buildMetadataBadge(
+                            Icons.star_rounded,
+                            '+₹${order.tipAmount.toStringAsFixed(0)} Tip',
+                            const Color(0xFF047857),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1330,18 +1465,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
-                      children: categories.map((cat) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryLight,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.recycling_rounded, size: 11, color: AppTheme.primary),
-                          const SizedBox(width: 4),
-                          Text(cat, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.primaryDark)),
-                        ]),
-                      )).toList(),
+                      children:
+                          categories
+                              .map(
+                                (cat) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryLight,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.recycling_rounded,
+                                        size: 11,
+                                        color: AppTheme.primary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        cat,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppTheme.primaryDark,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
                     ),
                   ],
 
@@ -1352,111 +1509,182 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       decoration: BoxDecoration(
                         color: const Color(0xFFFEF2F2),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFFCA5A5).withOpacity(0.5)),
-                      ),
-                      child: Row(children: [
-                        const Icon(Icons.offline_bolt_rounded, size: 16, color: AppTheme.error),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            context.t('goOnlineToStart'),
-                            style: const TextStyle(fontSize: 11, color: AppTheme.error, fontWeight: FontWeight.w600, height: 1.3),
-                          ),
+                        border: Border.all(
+                          color: const Color(0xFFFCA5A5).withOpacity(0.5),
                         ),
-                      ]),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.offline_bolt_rounded,
+                            size: 16,
+                            color: AppTheme.error,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              context.t('goOnlineToStart'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.error,
+                                fontWeight: FontWeight.w600,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
 
                   const SizedBox(height: 14),
 
                   // Action buttons
-                  Row(children: [
-                    if (canCancel) ...[
+                  Row(
+                    children: [
+                      if (canCancel) ...[
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed:
+                                () =>
+                                    _cancelReservedOrderDialog(context, order),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.error,
+                              side: const BorderSide(
+                                color: AppTheme.error,
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              minimumSize: const Size(0, 44),
+                            ),
+                            child: Text(
+                              context.t('cancelReservationShort'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                      ],
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => _cancelReservedOrderDialog(context, order),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppTheme.error,
-                            side: const BorderSide(color: AppTheme.error, width: 1.5),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            minimumSize: const Size(0, 44),
+                        flex: canCancel ? 2 : 1,
+                        child: Container(
+                          height: 44,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF059669), Color(0xFF064E3B)],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text(
-                            context.t('cancelReservationShort'),
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              if (!LeadService.instance.isWithinWorkingHours(
+                                _partner.partner,
+                                DateTime.now(),
+                              )) {
+                                AppTheme.showSnack(
+                                  context,
+                                  'Scheduled pickups can be started only during your working hours.',
+                                  isError: true,
+                                );
+                                return;
+                              }
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder:
+                                    (_) => const Center(
+                                      child: CircularProgressIndicator(
+                                        color: AppTheme.primary,
+                                      ),
+                                    ),
+                              );
+                              final ok = await _orders.updateOrderStatus(
+                                order.orderId,
+                                OrderStatus.partnerAssigned,
+                              );
+                              if (mounted)
+                                Navigator.pop(context); // close loader
+                              if (ok && mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (_) => OrderTrackingScreen(
+                                          orderId: order.orderId,
+                                        ),
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(
+                              Icons.navigation_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                            label: Text(
+                              context.t('startTripNow'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              minimumSize: const Size(0, 44),
+                              elevation: 0,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
                     ],
-                    Expanded(
-                      flex: canCancel ? 2 : 1,
-                      child: Container(
-                        height: 44,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF059669), Color(0xFF064E3B)],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            if (!LeadService.instance.isWithinWorkingHours(
-                              _partner.partner, DateTime.now())) {
-                              AppTheme.showSnack(context,
-                                'Scheduled pickups can be started only during your working hours.',
-                                isError: true);
-                              return;
-                            }
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (_) => const Center(
-                                child: CircularProgressIndicator(color: AppTheme.primary)),
-                            );
-                            final ok = await _orders.updateOrderStatus(
-                              order.orderId, OrderStatus.partnerAssigned);
-                            if (mounted) Navigator.pop(context); // close loader
-                            if (ok && mounted) {
-                              Navigator.push(context, MaterialPageRoute(
-                                builder: (_) => OrderTrackingScreen(orderId: order.orderId)));
-                            }
-                          },
-                          icon: const Icon(Icons.navigation_rounded, size: 16, color: Colors.white),
-                          label: Text(
-                            context.t('startTripNow'),
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            minimumSize: const Size(0, 44),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ]),
+                  ),
 
                   if (!canCancel) ...[
                     const SizedBox(height: 10),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.background,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.border.withOpacity(0.5)),
+                        border: Border.all(
+                          color: AppTheme.border.withOpacity(0.5),
+                        ),
                       ),
-                      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        const Icon(Icons.lock_rounded, size: 14, color: AppTheme.textSecondary),
-                        const SizedBox(width: 6),
-                        Expanded(child: Text(
-                          context.t('lockedCannotCancel'),
-                          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w600),
-                        )),
-                      ]),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.lock_rounded,
+                            size: 14,
+                            color: AppTheme.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              context.t('lockedCannotCancel'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -1468,7 +1696,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _cancelReservedOrderDialog(BuildContext screenContext, OrderModel order) {
+  void _cancelReservedOrderDialog(
+    BuildContext screenContext,
+    OrderModel order,
+  ) {
     showDialog(
       context: screenContext,
       builder: (dialogContext) {
@@ -1517,7 +1748,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     order,
                   );
                   // Ignore this order locally to prevent any stream race condition
-                  _declinedOrderIds.add(order.orderId);
+                  _declinedOrderTipAmounts[order.orderId] = order.tipAmount;
 
                   if (screenContext.mounted) {
                     Navigator.of(screenContext).pop(); // Close loading
@@ -1553,7 +1784,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
               child: Text(
                 Localizations.localeOf(screenContext).languageCode == 'hi'
-                    ? 'आरक्षण रद्द करें'
+                    ? 'Cancel करें'
                     : 'Cancel Reservation',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
@@ -1576,7 +1807,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFDBA74).withOpacity(0.5), width: 1.5),
+        border: Border.all(
+          color: const Color(0xFFFDBA74).withOpacity(0.5),
+          width: 1.5,
+        ),
         boxShadow: AppTheme.subtleShadow,
       ),
       child: Material(
@@ -1607,7 +1841,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     children: [
                       Text(
                         Localizations.localeOf(context).languageCode == 'hi'
-                            ? 'आरक्षित पिकअप असाइन किया गया है'
+                            ? 'Scheduled पिकअप assign किया गया है'
                             : 'Scheduled Pickup Assigned',
                         style: const TextStyle(
                           fontSize: 14,
@@ -1666,7 +1900,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
         ],
       ),

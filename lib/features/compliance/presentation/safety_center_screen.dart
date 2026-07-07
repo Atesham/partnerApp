@@ -234,7 +234,10 @@ class _SafetyCenterScreenState extends State<SafetyCenterScreen> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      descCtrl.dispose();
+      orderIdCtrl.dispose();
+    });
   }
 
   @override

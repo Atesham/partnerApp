@@ -1,16 +1,13 @@
 import 'dart:io';
+import '../../../core/utils/aadhaar_validator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/services/auth_service.dart';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:crypto/crypto.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/l10n/app_localizations.dart';
 import '../../../core/models/partner_model.dart';
@@ -378,6 +375,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       }
       if (_aadhaar.text.trim().length != 12) {
         AppTheme.showSnack(context, context.t('errorNoAadhaar'), isError: true);
+        return;
+      }
+      if (!VerhoeffValidator.isValidAadhaar(_aadhaar.text)) {
+        AppTheme.showSnack(
+          context,
+          context.t('errorInvalidAadhaar') ?? 'Invalid Aadhaar number. Please re-enter.',
+          isError: true,
+        );
         return;
       }
       if (_aadhaarFront == null) {

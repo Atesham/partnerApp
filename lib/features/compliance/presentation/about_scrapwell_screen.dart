@@ -201,7 +201,7 @@ class AboutScrapwellScreen extends StatelessWidget {
                     GestureDetector(
                       onTap: () async {
                         final uri = Uri.parse(
-                          'mailto:grievance@scrapwell.in?subject=Grievance%20Redressal%20Request',
+                          'mailto:help@scrapwell.in?subject=Grievance%20Redressal%20Request',
                         );
                         try {
                           await launchUrl(
@@ -217,7 +217,7 @@ class AboutScrapwellScreen extends StatelessWidget {
                         }
                       },
                       child: const Text(
-                        'grievance@scrapwell.in',
+                        'help@scrapwell.in',
                         style: TextStyle(
                           fontSize: 15,
                           color: AppTheme.primary,

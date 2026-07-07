@@ -50,6 +50,11 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        
+        <service 
+            android:name=".AppCleanupService" 
+            android:stopWithTask="false" />
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

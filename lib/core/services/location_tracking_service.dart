@@ -8,13 +8,30 @@ import '../providers/order_provider.dart';
 
 class LocationTrackingService {
   static final LocationTrackingService instance = LocationTrackingService._();
-  LocationTrackingService._();
+  LocationTrackingService._() {
+    _initServiceStatusListener();
+  }
 
   final _db = FirebaseFirestore.instance;
   StreamSubscription<Position>? _positionSub;
+  StreamSubscription<ServiceStatus>? _serviceStatusSub;
   bool _isTracking = false;
 
+  double? _lastUploadedLat;
+  double? _lastUploadedLng;
+  DateTime? _lastUploadTime;
+
   bool get isTracking => _isTracking;
+
+  void _initServiceStatusListener() {
+    _serviceStatusSub?.cancel();
+    _serviceStatusSub = Geolocator.getServiceStatusStream().listen((ServiceStatus status) {
+      if (status == ServiceStatus.disabled) {
+        stopTracking();
+        PartnerProvider().refreshLocationAvailability();
+      }
+    });
+  }
 
   /// Request location permissions
   Future<bool> requestPermissions() async {
@@ -65,10 +82,10 @@ class LocationTrackingService {
 
   /// Stop location tracking — marks partner as offline in live_locations
   void stopTracking() {
-    if (!_isTracking) return;
-    _isTracking = false;
     _positionSub?.cancel();
     _positionSub = null;
+    if (!_isTracking) return;
+    _isTracking = false;
     OrderProvider().removeListener(_onOrderStatusChanged);
 
     // Mark offline in live_locations immediately — no order will be routed
@@ -87,7 +104,7 @@ class LocationTrackingService {
     const distanceFilter = 20; // 20 meters minimum moved for high accuracy
     final interval = hasActiveOrder
         ? const Duration(seconds: 10)  // fast updates when on active order
-        : const Duration(seconds: 30); // 30s idle — fast enough for instant pickup
+        : const Duration(seconds: 60); // 60s idle — battery-efficient
 
     final androidSettings = AndroidSettings(
       accuracy: LocationAccuracy.high,
@@ -142,6 +159,37 @@ class LocationTrackingService {
     if (!PartnerProvider().locationAllowed) return;
 
     final now = DateTime.now();
+
+    // Stationary filtering to save battery / network data
+    final double? lastLat = _lastUploadedLat;
+    final double? lastLng = _lastUploadedLng;
+    bool shouldUpload = false;
+
+    if (lastLat == null || lastLng == null) {
+      shouldUpload = true;
+    } else {
+      final distance = Geolocator.distanceBetween(
+        lastLat,
+        lastLng,
+        position.latitude,
+        position.longitude,
+      );
+      final timeSinceLastUpload = _lastUploadTime != null
+          ? now.difference(_lastUploadTime!)
+          : const Duration(minutes: 6);
+
+      // Upload if moved >= 20 meters, or if on active order, or if last upload was >= 5 minutes ago (heartbeat)
+      if (distance >= 20.0 || OrderProvider().hasActiveOrder || timeSinceLastUpload.inMinutes >= 5) {
+        shouldUpload = true;
+      }
+    }
+
+    if (!shouldUpload) return;
+
+    _lastUploadedLat = position.latitude;
+    _lastUploadedLng = position.longitude;
+    _lastUploadTime = now;
+
     final geohash = _geohash(position.latitude, position.longitude);
 
     // ── 1. Update partners/{uid} with current GPS coordinates ──────────────

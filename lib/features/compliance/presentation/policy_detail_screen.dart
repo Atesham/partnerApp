@@ -139,63 +139,90 @@ class PolicyDetailScreen extends StatelessWidget {
                   : 'This legal document governs your eligibility, independent contractor relationship, account rules, operational obligations, and dispute resolution as a partner on the Scrapwell platform.',
           sections: [
             _PolicySection(
-              title: isHindi ? '1. स्वतंत्र ठेकेदार संबंध' : '1. Independent Contractor Relationship',
+              title:
+                  isHindi
+                      ? '1. स्वतंत्र ठेकेदार संबंध'
+                      : '1. Independent Contractor Relationship',
               body:
                   isHindi
                       ? 'स्क्रैपवेल केवल एक तकनीकी मंच प्रदान करता है। पार्टनर और स्क्रैपवेल के बीच संबंध एक स्वतंत्र ठेकेदार का है, न कि किसी कर्मचारी, एजेंट, या संयुक्त उद्यम का। पार्टनर अपनी मर्जी से काम करने के लिए स्वतंत्र है, और उसके पास काम के घंटे और काम की मात्रा चुनने की पूर्ण स्वतंत्रता है।'
                       : 'This Agreement does not create an employment, agency, joint venture, or partnership relationship between you and Scrapwell. You act solely as an independent contractor. You have the absolute right to determine your own work schedules, choose the orders you accept or decline, and run your business operations independently.',
             ),
             _PolicySection(
-              title: isHindi ? '2. पात्रता एवं पंजीकरण' : '2. Eligibility & Registration',
+              title:
+                  isHindi
+                      ? '2. पात्रता एवं पंजीकरण'
+                      : '2. Eligibility & Registration',
               body:
                   isHindi
                       ? 'भागीदार बनने के लिए आपकी आयु न्यूनतम 18 वर्ष होनी चाहिए। आपके पास भारत में एक वैध व्यवसाय होना चाहिए और सभी आवश्यक कानूनी दस्तावेज (जैसे पैन कार्ड, आधार कार्ड, बैंक खाता विवरण और वैकल्पिक रूप से जीएसटी प्रमाणपत्र) होने अनिवार्य हैं। सभी विवरण सटीक और सत्य होने चाहिए।'
                       : 'To register as a partner, you must be at least 18 years old and legally authorized to operate a scrap collection/recycling business in India. You must provide authentic, updated documentation including Aadhaar, PAN, active bank account details, and GST certificates (where applicable) for identity and fraud-prevention checks.',
             ),
             _PolicySection(
-              title: isHindi ? '3. परिचालन दायित्व और दर चार्ट' : '3. Operational Standards & Rate Card',
+              title:
+                  isHindi
+                      ? '3. परिचालन दायित्व और दर चार्ट'
+                      : '3. Operational Standards & Rate Card',
               body:
                   isHindi
                       ? 'भागीदारों को अनिवार्य रूप से प्रमाणित डिजिटल तराजू (वजन कांटे) का उपयोग करना होगा। यांत्रिक तराजू का उपयोग प्रतिबंधित है। आपको ग्राहक के सामने वास्तविक वजन दर्ज करना होगा और स्क्रैपवेल ऐप पर प्रदर्शित dynamic दरों का पालन करना होगा। दरों में हेरफेर या मूल्य को गलत तरीके से दिखाना सख्त मना है।'
                       : 'Partners must conduct all scrap weighing in front of customers using calibrated, government-certified digital scales. The use of manual spring balances is strictly prohibited. You are obligated to pay customers the exact dynamic rates displayed on the Scrapwell app. Rate manipulation, hidden charges, or scale tampering will lead to immediate account termination.',
             ),
             _PolicySection(
-              title: isHindi ? '4. वित्तीय निपटान और सेवा शुल्क (2%)' : '4. Commission & Financial Settlements',
+              title:
+                  isHindi
+                      ? '4. वित्तीय निपटान और सेवा शुल्क (2%)'
+                      : '4. Commission & Financial Settlements',
               body:
                   isHindi
                       ? 'प्रत्येक पूर्ण पिकअप मूल्य पर स्क्रैपवेल 2% का सेवा शुल्क (कमीशन) काटेगा। शेष राशि (98%) दैनिक ऑटो-पेआउट के माध्यम से अगले व्यावसायिक दिन (T+1) शाम 6:00 बजे तक आपके सत्यापित बैंक खाते में स्थानांतरित कर दी जाएगी। यदि बैंक सर्वर या गलत क्रेडेंशियल्स के कारण भुगतान विफल होता है, तो राशि वॉलेट में सुरक्षित रखी जाएगी।'
                       : 'Scrapwell charges a flat 2% platform service fee (commission) on the gross value of each successfully completed pickup. Payout settlements for the remaining 98% are processed automatically on a T+1 schedule (by 6:00 PM on the next business day). Failed bank transfers due to incorrect credentials will be safely escrowed in your wallet until banking details are corrected.',
             ),
             _PolicySection(
-              title: isHindi ? '5. गैर-बायपास (एंटी-सर्कमवेंशन) नीति' : '5. Anti-Circumvention & Lead Integrity',
+              title:
+                  isHindi
+                      ? '5. गैर-बायपास (एंटी-सर्कमवेंशन) नीति'
+                      : '5. Anti-Circumvention & Lead Integrity',
               body:
                   isHindi
                       ? 'मंच द्वारा मिले ग्राहकों के साथ कोई भी निजी सौदा करना, भविष्य के लिए व्यक्तिगत संपर्क नंबर साझा करना, या प्लेटफॉर्म शुल्क से बचने के लिए सीधे लेन-देन करना सख्त वर्जित है। स्क्रैपवेल द्वारा प्रदर्शित प्रत्येक पिकअप लीड प्लेटफॉर्म की संपत्ति है। इसका उल्लंघन करने पर खाता स्थायी रूप से बंद किया जा सकता है।'
                       : 'Partners are strictly prohibited from bypassing the Scrapwell platform to conduct direct, offline transactions with customers introduced via the app. Sharing personal mobile numbers for direct future bookings or soliciting platform users off-app violates lead integrity rules. Violations will result in deactivation and holding of outstanding settlements.',
             ),
             _PolicySection(
-              title: isHindi ? '6. व्यावसायिक आचरण और सुरक्षा' : '6. Professional Conduct & Safety Protocol',
+              title:
+                  isHindi
+                      ? '6. व्यावसायिक आचरण और सुरक्षा'
+                      : '6. Professional Conduct & Safety Protocol',
               body:
                   isHindi
                       ? 'ग्राहकों के साथ हमेशा सम्मानपूर्वक और विनम्रतापूर्वक व्यवहार करें। किसी भी प्रकार की गाली-गलौज, दुर्व्यवहार या अभद्र व्यवहार के लिए मंच पर शून्य सहिष्णुता (जीरो टॉलरेंस) नीति है। भागीदारों को सुरक्षित ड्राइविंग नियमों का पालन करना होगा और पिकअप के दौरान हेलमेट, सुरक्षात्मक जूते और बेल्ट जैसे बुनियादी सुरक्षा उपकरणों का उपयोग करना होगा।'
                       : 'You must maintain a high standard of professional behavior and respect customer privacy. Scrapwell enforces a zero-tolerance policy against physical or verbal abuse, harassment, discrimination, or fraud. Partners must strictly follow transport safety regulations, avoid overloading vehicles, and use proper safety gear during material collection.',
             ),
             _PolicySection(
-              title: isHindi ? '7. खाता निलंबन और स्थायी बंदी' : '7. Account Suspension & Termination',
+              title:
+                  isHindi
+                      ? '7. खाता निलंबन और स्थायी बंदी'
+                      : '7. Account Suspension & Termination',
               body:
                   isHindi
                       ? 'स्क्रैपवेल के पास बिना किसी पूर्व सूचना के उन भागीदारों के खातों को निलंबित या स्थायी रूप से बंद करने का अधिकार सुरक्षित है जो: धोखाधड़ी में लिप्त हैं, तराजू में हेरफेर करते हैं, नियमों का उल्लंघन करते हैं, ग्राहकों से दुर्व्यवहार करते हैं, या 4.0 से कम की स्टार रेटिंग बनाए रखते हैं।'
                       : 'Scrapwell reserves the absolute right to temporarily suspend or permanently deactivate accounts for violating platform policies, scale fraud, repeatedly rejecting assigned slots, offline transacting, or failing to maintain a minimum average rating of 4.0 stars.',
             ),
             _PolicySection(
-              title: isHindi ? '8. दायित्व सीमाएं और क्षतिपूर्ति' : '8. Limitation of Liability & Indemnity',
+              title:
+                  isHindi
+                      ? '8. दायित्व सीमाएं और क्षतिपूर्ति'
+                      : '8. Limitation of Liability & Indemnity',
               body:
                   isHindi
                       ? 'स्क्रैपवेल केवल एक तकनीकी प्रदाता है और ग्राहकों के आचरण, चोरी, दुर्घटना, या तीसरे पक्ष के नुकसान के लिए उत्तरदायी नहीं है। पार्टनर स्क्रैपवेल, उसके निदेशकों और कर्मचारियों को किसी भी परिचालन घाटे, वाहन दुर्घटनाओं, या कानूनी दावों से पूरी तरह मुक्त (क्षतिपूर्ति) रखने के लिए सहमत है।'
                       : 'Scrapwell operates solely as a digital matching platform and is not liable for customer conduct, transit accidents, scrap ownership disputes, or property damage. You agree to defend, indemnify, and hold harmless Scrapwell and its affiliates from any claims, losses, or legal liabilities arising from your field operations.',
             ),
             _PolicySection(
-              title: isHindi ? '9. विवाद और मध्यस्थता' : '9. Dispute Resolution & Governing Law',
+              title:
+                  isHindi
+                      ? '9. विवाद और मध्यस्थता'
+                      : '9. Dispute Resolution & Governing Law',
               body:
                   isHindi
                       ? 'यह समझौता भारतीय कानूनों द्वारा शासित होगा। दरों, कमीशन, या सेवा से संबंधित किसी भी विवाद का निपटारा आपसी बातचीत या भारतीय मध्यस्थता अधिनियम के तहत गुरुग्राम, हरियाणा में नियुक्त एकल मध्यस्थ के माध्यम से किया जाएगा। गुरुग्राम की अदालतों का विशेष क्षेत्राधिकार होगा।'
@@ -425,35 +452,50 @@ class PolicyDetailScreen extends StatelessWidget {
                   : 'This Privacy Policy explains how Scrapwell collects, processes, secures, and discloses your personal data in strict compliance with the Digital Personal Data Protection (DPDP) Act 2023 and the Information Technology Act 2000 of India.',
           sections: [
             _PolicySection(
-              title: isHindi ? '1. जानकारी जो हम एकत्र करते हैं' : '1. Information We Collect',
+              title:
+                  isHindi
+                      ? '1. जानकारी जो हम एकत्र करते हैं'
+                      : '1. Information We Collect',
               body:
                   isHindi
                       ? 'हम निम्नलिखित प्रकार के डेटा एकत्र करते हैं: (क) प्रोफ़ाइल जानकारी (नाम, फोन नंबर, व्यावसायिक नाम, दुकान का पता, तस्वीरें); (ख) पहचान दस्तावेज (आधार नंबर, पैन नंबर, बैंक खाता और यूपीआई विवरण); (ग) स्थान डेटा (पिकअप खोज और लाइव नेविगेशन सक्षम करने के लिए पृष्ठभूमि (background) और अग्रभूमि (foreground) में जीपीएस स्थान); (घ) उपयोग और तकनीकी डेटा (डिवाइस की जानकारी, आईपी पता, और ऐप गतिविधि लॉग)।'
                       : 'We collect several types of data to provide and secure our services: (a) Profile and Registration details (your full name, mobile number, shop name, shop address, profile photo); (b) Identity & Verification Documents (Aadhaar number, PAN card, active bank account details, UPI ID); (c) Real-time Location Data (precise GPS coordinates collected in the foreground and background while you are marked online to enable order routing and location-tracking services); (d) Usage and Telemetry details (device identifiers, IP address, operating system, and app crash logs).',
             ),
             _PolicySection(
-              title: isHindi ? '2. डेटा उपयोग के कानूनी आधार और उद्देश्य' : '2. Legal Basis & Purposes of Data Usage',
+              title:
+                  isHindi
+                      ? '2. डेटा उपयोग के कानूनी आधार और उद्देश्य'
+                      : '2. Legal Basis & Purposes of Data Usage',
               body:
                   isHindi
                       ? 'हम आपके डेटा का उपयोग निम्नलिखित कानूनी उद्देश्यों के लिए करते हैं: (क) आपके स्थान के आधार पर निकटतम पिकअप ऑर्डर मिलान करने के लिए; (ख) बैंक खातों में कमीशन काटकर सुरक्षित रूप से भुगतान भेजने के लिए; (ग) धोखाधड़ी और तराजू में हेरफेर रोकने के लिए पहचान और पृष्ठभूमि सत्यापन करने हेतु; (घ) सुरक्षा अलर्ट और ग्राहक सेवा प्रदान करने के लिए; और (ङ) कर और ऑडिट से संबंधित वैधानिक आवश्यकताओं का पालन करने के लिए।'
                       : 'We process your personal data under the legal basis of contract performance, consent, and statutory obligations for the following purposes: (a) Matching and routing pickup orders near your location; (b) Processing commission deductions and settling daily payouts directly into your bank account; (c) Authenticating your identity and preventing fraudulent scale or profile activities; (d) Sending safety notifications, location updates, and facilitating customer support; and (e) Complying with tax audit and government regulations in India.',
             ),
             _PolicySection(
-              title: isHindi ? '3. डेटा साझा करना और प्रकटीकरण' : '3. Data Sharing & Third-Party Disclosure',
+              title:
+                  isHindi
+                      ? '3. डेटा साझा करना और प्रकटीकरण'
+                      : '3. Data Sharing & Third-Party Disclosure',
               body:
                   isHindi
                       ? 'हम आपकी गोपनीयता का सम्मान करते हैं। आपकी व्यक्तिगत जानकारी कभी भी विज्ञापनदाताओं को नहीं बेची जाती है। आपका नाम, फोटो, वाहन प्रकार और लाइव लोकेशन केवल उन ग्राहकों के साथ साझा की जाती है जिनका पिकअप ऑर्डर आपने स्वीकार किया है। वित्तीय डेटा को भुगतान गेटवे और सुरक्षा ऑडिटर्स के साथ सुरक्षित रूप से साझा किया जाता है। हम कानूनी वारंट या सरकारी आदेश के तहत आवश्यक होने पर डेटा प्रकट कर सकते हैं।'
                       : 'We do not sell your personal data. We disclose information strictly as follows: (a) Sharing your name, business name, photo, vehicle type, rating, and live GPS location with customers whose order you have accepted to ensure transparency; (b) Sharing financial details with RBI-licensed payment processors to execute settlements; and (c) Disclosing information under statutory obligations, court warrants, or to law enforcement agencies for national security and fraud prevention.',
             ),
             _PolicySection(
-              title: isHindi ? '4. डेटा सुरक्षा और सुरक्षा उपाय (DPDP अनुपालन)' : '4. Data Protection & Security Controls (DPDP)',
+              title:
+                  isHindi
+                      ? '4. डेटा सुरक्षा और सुरक्षा उपाय (DPDP अनुपालन)'
+                      : '4. Data Protection & Security Controls (DPDP)',
               body:
                   isHindi
                       ? 'डीपीडीडी अधिनियम 2023 के अनुपालन में, आपकी संवेदनशील जानकारी (जैसे आधार संख्या और बैंक विवरण) मजबूत AES-256 एन्क्रिप्शन और क्रिप्टोग्राफिक टोकनाइजेशन का उपयोग करके संग्रहीत की जाती है। हमारे सर्वर अत्याधुनिक फ़ायरवॉल और सुरक्षा नियंत्रणों से लैस हैं। आधार संख्या के सत्यापन के बाद उसे नष्ट कर दिया जाता है और केवल एक सुरक्षित क्रिप्टोग्राफिक हैश ही डेटाबेस में संग्रहीत रखा जाता है।'
                       : 'In strict compliance with the DPDP Act 2023, Scrapwell employs advanced physical, technical, and administrative security measures. Your sensitive personal data, including bank accounts and identification proof, is encrypted using AES-256 standards both in transit and at rest. Raw Aadhaar numbers are immediately destroyed after successful verification, retaining only a secure SHA-256 cryptographic hash to ensure profile uniqueness.',
             ),
             _PolicySection(
-              title: isHindi ? '5. उपयोगकर्ता अधिकार और डेटा प्रतिधारण' : '5. Data Rights & Retention Schedule',
+              title:
+                  isHindi
+                      ? '5. उपयोगकर्ता अधिकार और डेटा प्रतिधारण'
+                      : '5. Data Rights & Retention Schedule',
               body:
                   isHindi
                       ? 'आपके पास अपने व्यक्तिगत डेटा तक पहुँचने, उसमें संशोधन करने, या खाता हटाने का अनुरोध करने का पूर्ण अधिकार है। खाता हटाने के बाद, आपके सभी व्यक्तिगत डेटा, पते और चित्र 30 दिनों के भीतर हटा दिए जाते हैं। हालांकि, भारतीय कानूनों (जैसे आयकर अधिनियम) के तहत पिछले वित्तीय रिकॉर्ड और ऑडिट लॉग को 8 वर्षों तक सुरक्षित रखा जाएगा।'
@@ -566,8 +608,8 @@ class PolicyDetailScreen extends StatelessWidget {
                       : '1. Grievance Officer Details',
               body:
                   isHindi
-                      ? 'नाम: श्री रमेश शर्मा (शिकायत अधिकारी)। ईमेल: grievance@scrapwell.in। पता: सेक्टर 10A, गुरुग्राम, हरियाणा - 122001।'
-                      : 'Name: Mr. Saurabh (Grievance Officer)\nEmail: grievance@scrapwell.in\nRegistered Address: Sector 10A, Gurgaon, Haryana - 122001.',
+                      ? 'नाम: श्री सौरभ  (शिकायत अधिकारी)। ईमेल: help@scrapwell.in। पता: सेक्टर 10A, गुरुग्राम, हरियाणा - 122001।'
+                      : 'Name: Mr. Saurabh (Grievance Officer)\nEmail: help@scrapwell.in\nRegistered Address: Sector 10A, Gurgaon, Haryana - 122001.',
             ),
             _PolicySection(
               title: isHindi ? '2. समाधान समय सीमा' : '2. Turnaround Time',

@@ -26,6 +26,8 @@ class OrderProvider extends ChangeNotifier {
   StreamSubscription<QuerySnapshot>? _ordersSub;
   StreamSubscription<QuerySnapshot>? _scheduledSub;
   final Set<String> _autoAssigning = {}; // guard against duplicate triggers
+  DateTime? _lastOrdersCacheWriteTime;
+  int _lastActiveOrdersCount = 0;
 
   List<OrderModel> get activeOrders => _activeOrders;
   List<OrderModel> get reservedOrders => _reservedOrders;
@@ -72,14 +74,22 @@ class OrderProvider extends ChangeNotifier {
 
           // Current active order (first partner-assigned or higher)
           _currentOrder = _activeOrders.isNotEmpty ? _activeOrders.first : null;
-
+ 
           notifyListeners();
-
-          // Cache the fresh orders list locally
-          SharedPreferences.getInstance().then((prefs) {
-            final jsonList = all.map((o) => o.toJson()).toList();
-            prefs.setString('cached_orders_$uid', CacheUtils.encode(jsonList));
-          }).catchError((_) {});
+ 
+          // Cache the fresh orders list locally (throttled to once per 30 seconds or on active orders count changes)
+          final activeCountChanged = _lastActiveOrdersCount != _activeOrders.length;
+          _lastActiveOrdersCount = _activeOrders.length;
+          final now = DateTime.now();
+          if (_lastOrdersCacheWriteTime == null ||
+              activeCountChanged ||
+              now.difference(_lastOrdersCacheWriteTime!) > const Duration(seconds: 30)) {
+            _lastOrdersCacheWriteTime = now;
+            SharedPreferences.getInstance().then((prefs) {
+              final jsonList = all.map((o) => o.toJson()).toList();
+              prefs.setString('cached_orders_$uid', CacheUtils.encode(jsonList));
+            }).catchError((_) {});
+          }
         });
   }
 
@@ -273,11 +283,10 @@ class EarningsProvider extends ChangeNotifier {
   String get scrapwellPayeeName => _scrapwellPayeeName;
   bool get hasCommissionDue => _commissionDueBalance > 0.01;
   bool get shouldBlockForCommission =>
-      _commissionBlocked ||
-      _commissionDueBalance >= 500 ||
-      (hasCommissionDue &&
-          _commissionDueAt != null &&
-          DateTime.now().isAfter(_commissionDueAt!));
+      hasCommissionDue &&
+      (_commissionBlocked ||
+       _commissionDueBalance >= 500 ||
+       (_commissionDueAt != null && DateTime.now().isAfter(_commissionDueAt!)));
   bool get isLoading => _isLoading;
 
   /// Safely notify listeners after the current frame to avoid triggering

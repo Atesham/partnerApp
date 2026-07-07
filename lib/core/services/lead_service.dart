@@ -61,8 +61,11 @@ class LeadService {
       return snap.docs
           .map((d) => OrderModel.fromJson({...d.data(), 'orderId': d.id.isNotEmpty ? (d.data()['orderId'] ?? d.id) : d.id}))
           .where((order) {
-            // Exclude if partner has declined/cancelled this order
-            if (order.declinedPartnerIds.contains(uid)) return false;
+            // Exclude if partner has declined/cancelled this order at the same or lower tip
+            if (order.declinedPartners.containsKey(uid)) {
+              final declinedTip = order.declinedPartners[uid] ?? 0.0;
+              if (order.tipAmount <= declinedTip) return false;
+            }
 
             // Filter: must be instant pickup (supports both field names:
             // pickupType='instant' used by newer orders, orderType='instant'
@@ -448,7 +451,7 @@ class LeadService {
             'status': OrderStatus.reserved.name,
             'assignedAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
-            'declinedPartnerIds': FieldValue.arrayUnion([uid]),
+            'declinedPartners.$uid': order.tipAmount,
           });
         } else {
           // No eligible partner — return to broadcast pool
@@ -463,7 +466,7 @@ class LeadService {
             'expiresAt': Timestamp.fromDate(
                 DateTime.now().add(const Duration(minutes: 2))),
             'updatedAt': FieldValue.serverTimestamp(),
-            'declinedPartnerIds': FieldValue.arrayUnion([uid]),
+            'declinedPartners.$uid': order.tipAmount,
           });
         }
       });
@@ -494,7 +497,10 @@ class LeadService {
     if (partner.status != PartnerStatus.approved) return null;
     if (partner.deleted) return null;
     if (partner.shouldBlockForCommission) return null;
-    if (order.declinedPartnerIds.contains(partner.uid)) return null;
+    if (order.declinedPartners.containsKey(partner.uid)) {
+      final declinedTip = order.declinedPartners[partner.uid] ?? 0.0;
+      if (order.tipAmount <= declinedTip) return null;
+    }
 
     // Use live GPS location if available, else fall back to shop location
     final pLat = partner.currentLat != 0.0 ? partner.currentLat : partner.shopLat;

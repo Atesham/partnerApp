@@ -788,7 +788,12 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      upiCtrl.dispose();
+      holderCtrl.dispose();
+      accountCtrl.dispose();
+      ifscCtrl.dispose();
+    });
   }
 }
 
