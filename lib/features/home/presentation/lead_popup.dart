@@ -10,6 +10,7 @@ import '../../../core/models/partner_model.dart';
 import '../../../core/services/lead_service.dart';
 import '../../../core/utils/location_utils.dart';
 import '../../orders/presentation/order_tracking_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 
 class LeadPopup extends StatefulWidget {
@@ -82,10 +83,29 @@ class _LeadPopupState extends State<LeadPopup>
     
     // Play loopable local lead sound
     try {
+      await _audioPlayer.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            isSpeakerphoneOn: true,
+            stayAwake: true,
+            contentType: AndroidContentType.music,
+            usageType: AndroidUsageType.alarm,
+            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+          ),
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: {
+              AVAudioSessionOptions.defaultToSpeaker,
+              AVAudioSessionOptions.mixWithOthers,
+            },
+          ),
+        ),
+      );
+      await _audioPlayer.setVolume(1.0);
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.play(AssetSource('ringtone/crisp-fast-two-sec-1-1782943688959_ogLriGsj.wav'));
-    } catch (_) {
-      // Fallback silently if play fails
+    } catch (e) {
+      debugPrint('Error playing lead popup ringtone: $e');
     }
   }
 
@@ -338,9 +358,13 @@ class _LeadPopupState extends State<LeadPopup>
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(16),
-                                        child: Image.network(
-                                          widget.order.imageUrls[idx],
+                                        child: CachedNetworkImage(
+                                          imageUrl: widget.order.imageUrls[idx],
                                           fit: BoxFit.contain,
+                                          placeholder: (context, url) => const Center(
+                                            child: CircularProgressIndicator(color: AppTheme.primary),
+                                          ),
+                                          errorWidget: (context, url, error) => const Icon(Icons.error_outline),
                                         ),
                                       ),
                                     ),
@@ -353,12 +377,24 @@ class _LeadPopupState extends State<LeadPopup>
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(11),
-                                    child: Image.network(
-                                      widget.order.imageUrls[idx],
+                                    child: CachedNetworkImage(
+                                      imageUrl: widget.order.imageUrls[idx],
                                       width: 80,
                                       height: 80,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) => Container(
+                                      placeholder: (context, url) => Container(
+                                        width: 80,
+                                        height: 80,
+                                        color: AppTheme.border.withOpacity(0.3),
+                                        child: const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                                          ),
+                                        ),
+                                      ),
+                                      errorWidget: (context, url, error) => Container(
                                         width: 80,
                                         height: 80,
                                         color: AppTheme.border,

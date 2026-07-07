@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/l10n/app_localizations.dart';
 import '../../../core/providers/order_provider.dart';
@@ -78,6 +79,21 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     } catch (_) {
       if (mounted) {
         AppTheme.showSnack(context, 'Could not open phone dialer.', isError: true);
+      }
+    }
+  }
+
+  Future<void> _openWhatsAppSupport() async {
+    final orderId = _order?.orderId ?? '';
+    final message = Uri.encodeComponent(
+      'Hello Scrapwell Support, I need help with my order${orderId.isNotEmpty ? ' #${orderId.substring(0, orderId.length.clamp(0, 8)).toUpperCase()}' : ''}.',
+    );
+    final uri = Uri.parse('https://wa.me/918744081962?text=$message');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (mounted) {
+        AppTheme.showSnack(context, 'Could not open WhatsApp. Call +91 8744081962 for support.', isError: true);
       }
     }
   }
@@ -175,8 +191,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                           children: [
                             Text(
                               order.status == OrderStatus.partnerAssigned
-                                  ? 'Head to Customer Location'
-                                  : 'Arriving at Customer Destination',
+                                  ? context.t('headToCustomer')
+                                  : context.t('arrivingAtDest'),
                               style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
                             ),
                             const SizedBox(height: 4),
@@ -211,11 +227,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 const SizedBox(height: 14),
                 // Quick actions
                 Row(children: [
-                  Expanded(child: _actionBtn(Icons.call_rounded, 'Call', AppTheme.info, _callCustomer)),
+                  Expanded(child: _actionBtn(Icons.call_rounded, context.t('callCustomer'), AppTheme.info, _callCustomer)),
                   const SizedBox(width: 10),
-                  Expanded(child: _actionBtn(Icons.navigation_rounded, 'Navigate', AppTheme.primary, _startNavigation)),
+                  Expanded(child: _actionBtn(Icons.navigation_rounded, context.t('startNavigation'), AppTheme.primary, _startNavigation)),
                   const SizedBox(width: 10),
-                  Expanded(child: _actionBtn(Icons.chat_rounded, 'Support', AppTheme.warning, () {})),
+                  Expanded(child: _actionBtn(Icons.chat_rounded, context.t('support'), AppTheme.warning, _openWhatsAppSupport)),
                 ]),
                 const SizedBox(height: 20),
                 // Status CTA
@@ -255,11 +271,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       builder: (context) {
         String? selectedReason;
         final reasons = [
-          'Vehicle breakdown',
-          'Customer unavailable / not responding',
-          'Negotiation failed / incorrect rate selection',
-          'Emergency / Personal reasons',
-          'Other',
+          context.t('cancelReasonVehicle'),
+          context.t('cancelReasonCustomer'),
+          context.t('cancelReasonNegotiation'),
+          context.t('cancelReasonEmergency'),
+          context.t('cancelReasonOther'),
         ];
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -390,7 +406,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Customer Details', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
+          Text(context.t('customerDetails'), style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           Row(children: [
             CircleAvatar(
@@ -441,7 +457,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('Scrap Details', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
+            Text(context.t('scrapDetails'), style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
             Text('Est. ₹${order.estimatedPayout.toStringAsFixed(0)}',
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.primary)),
           ]),
@@ -456,7 +472,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           ),
           if (order.imageUrls.isNotEmpty) ...[
             const SizedBox(height: 12),
-            const Text('Scrap Photos', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
+            Text(context.t('scrapPhotos'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             SizedBox(
               height: 80,
@@ -473,9 +489,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child: Image.network(
-                              order.imageUrls[idx],
+                            child: CachedNetworkImage(
+                              imageUrl: order.imageUrls[idx],
                               fit: BoxFit.contain,
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(color: AppTheme.primary),
+                              ),
+                              errorWidget: (context, url, error) => const Icon(Icons.error_outline),
                             ),
                           ),
                         ),
@@ -488,12 +508,24 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(11),
-                        child: Image.network(
-                          order.imageUrls[idx],
+                        child: CachedNetworkImage(
+                          imageUrl: order.imageUrls[idx],
                           width: 80,
                           height: 80,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
+                          placeholder: (context, url) => Container(
+                            width: 80,
+                            height: 80,
+                            color: AppTheme.border.withOpacity(0.3),
+                            child: const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
                             width: 80,
                             height: 80,
                             color: AppTheme.border,
@@ -547,7 +579,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     switch (order.status) {
       case OrderStatus.partnerAssigned:
         return GradientButton(
-          label: 'Start Navigation',
+          label: context.t('startNavigation'),
           onPressed: () {
             _startNavigation();
             _updateStatus(OrderStatus.partnerArriving);
@@ -556,13 +588,13 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         );
       case OrderStatus.partnerArriving:
         return GradientButton(
-          label: "I've Arrived",
+          label: context.t('iArrived'),
           onPressed: () => _showOtpVerificationDialog(order),
           icon: Icons.check_circle_rounded,
         );
       case OrderStatus.pickupStarted:
         return GradientButton(
-          label: 'Start Pickup & Weighing',
+          label: context.t('startPickupWeighing'),
           onPressed: () {
             Navigator.push(
               context,

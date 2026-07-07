@@ -21,16 +21,18 @@ class _WeighingEntry {
   String category;
   double weight;
   double rate;
+  final double customerRate; // The original rate from order — read-only
   final TextEditingController weightCtrl;
-  final TextEditingController rateCtrl;
 
-  _WeighingEntry({required this.category, required this.weight, required this.rate})
-      : weightCtrl = TextEditingController(text: weight > 0 ? weight.toString() : ''),
-        rateCtrl = TextEditingController(text: rate > 0 ? rate.toString() : '');
+  _WeighingEntry({required this.category, required this.weight, required this.rate, required this.customerRate})
+      : weightCtrl = TextEditingController(text: weight > 0 ? weight.toString() : '');
 
-  double get total => weight * rate;
+  // Always uses the customer's original rate for payout calculation
+  double get total => weight * customerRate;
 
-  void dispose() { weightCtrl.dispose(); rateCtrl.dispose(); }
+  void dispose() {
+    weightCtrl.dispose();
+  }
 }
 
 class _WeighingScreenState extends State<WeighingScreen> {
@@ -43,11 +45,18 @@ class _WeighingScreenState extends State<WeighingScreen> {
   @override
   void initState() {
     super.initState();
-    _entries = widget.order.scrapItems.map((item) => _WeighingEntry(
-      category: item.category,
-      weight: item.actualWeight > 0 ? item.actualWeight : item.estimatedWeight,
-      rate: item.actualRate > 0 ? item.actualRate : item.estimatedRate,
-    )).toList();
+    _entries = widget.order.scrapItems.map((item) {
+      // Prefer actual recorded weight if available, else estimated
+      final w = item.actualWeight > 0 ? item.actualWeight : item.estimatedWeight;
+      // The canonical rate is what the customer booked at — never editable
+      final customerRate = item.estimatedRate > 0 ? item.estimatedRate : item.actualRate;
+      return _WeighingEntry(
+        category: item.category,
+        weight: w,
+        rate: customerRate,
+        customerRate: customerRate,
+      );
+    }).toList();
   }
 
   @override
@@ -74,6 +83,10 @@ class _WeighingScreenState extends State<WeighingScreen> {
 
   double get _totalPayout => _entries.fold(0, (sum, e) => sum + e.total);
 
+  // Commission = 2% of total payout
+  double get _commission => _totalPayout * 0.02;
+  double get _paidToCustomer => _totalPayout - _commission;
+
   Future<void> _submit() async {
     if (_weighingPhoto == null) {
       AppTheme.showSnack(context, context.t('photoRequiredError'), isError: true);
@@ -93,7 +106,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
       final e = _entries[entry.key];
       final item = entry.value;
       item.actualWeight = e.weight;
-      item.actualRate = e.rate;
+      item.actualRate = e.customerRate; // always use the customer's booked rate
       return item;
     }).toList();
 
@@ -110,7 +123,13 @@ class _WeighingScreenState extends State<WeighingScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => _FinalConfirmationScreen(order: updated, payout: _totalPayout),
+          builder: (_) => _FinalConfirmationScreen(
+            order: updated,
+            payout: _totalPayout,
+            commission: _commission,
+            paidToCustomer: _paidToCustomer,
+            entries: _entries,
+          ),
         ),
       );
     } else {
@@ -118,10 +137,9 @@ class _WeighingScreenState extends State<WeighingScreen> {
     }
   }
 
-  void _updateEntry(int i, {double? weight, double? rate}) {
+  void _updateEntry(int i, {double? weight}) {
     setState(() {
       if (weight != null) _entries[i].weight = weight;
-      if (rate != null) _entries[i].rate = rate;
     });
   }
 
@@ -131,7 +149,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: AppTheme.background,
-        title: const Text('Enter Scrap Weights', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+        title: Text(context.t('enterWeights'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.textPrimary),
           onPressed: () => Navigator.pop(context),
@@ -145,7 +163,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header card
+                        // Info header
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
@@ -153,8 +171,9 @@ class _WeighingScreenState extends State<WeighingScreen> {
                           child: Row(children: [
                             const Icon(Icons.info_outline_rounded, color: AppTheme.primary, size: 18),
                             const SizedBox(width: 10),
-                            const Expanded(child: Text('Enter actual weight and rate for each category.',
-                              style: TextStyle(color: AppTheme.primaryDark, fontSize: 13, fontWeight: FontWeight.w500))),
+                            Expanded(child: Text(
+                              context.t('enterWeights') + '. ' + context.t('customerRate') + ' ' + context.t('originalRate') + '.',
+                              style: const TextStyle(color: AppTheme.primaryDark, fontSize: 13, fontWeight: FontWeight.w500))),
                           ]),
                         ),
                         const SizedBox(height: 20),
@@ -164,10 +183,9 @@ class _WeighingScreenState extends State<WeighingScreen> {
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Row(
                             children: [
-                              const Expanded(flex: 3, child: Text('Category', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600))),
-                              const Expanded(flex: 2, child: Text('Weight (kg)', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600), textAlign: TextAlign.center)),
-                              const Expanded(flex: 2, child: Text('Rate (₹/kg)', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600), textAlign: TextAlign.center)),
-                              const Expanded(flex: 2, child: Text('Total', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600), textAlign: TextAlign.right)),
+                              Expanded(flex: 3, child: Text(context.t('scrapDetails'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600))),
+                              Expanded(flex: 2, child: Text(context.t('weight'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600), textAlign: TextAlign.center)),
+                              Expanded(flex: 2, child: Text(context.t('total'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600), textAlign: TextAlign.right)),
                             ],
                           ),
                         ),
@@ -181,32 +199,48 @@ class _WeighingScreenState extends State<WeighingScreen> {
                           child: Divider(thickness: 1, color: AppTheme.border),
                         ),
 
-                        // Total
+                        // Billing summary card
                         Container(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [Color(0xFF064E3B), Color(0xFF059669)],
                               begin: Alignment.topLeft, end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(18),
                           ),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.payments_rounded, color: Colors.white, size: 24),
-                              const SizedBox(width: 14),
-                              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                const Text('Total Payout', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 2),
-                                Text('₹${_totalPayout.toStringAsFixed(0)}',
-                                  style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+                              Row(children: [
+                                const Icon(Icons.payments_rounded, color: Colors.white, size: 22),
+                                const SizedBox(width: 10),
+                                Text(context.t('orderBilling'), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                                const Spacer(),
+                                Text(
+                                  '${_entries.fold(0.0, (s, e) => s + e.weight).toStringAsFixed(1)} kg',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                                ),
                               ]),
-                              const Spacer(),
-                              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                                Text('${_entries.length} items', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                                Text('${_entries.fold(0.0, (s, e) => s + e.weight).toStringAsFixed(1)} kg total',
-                                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-                              ]),
+                              const SizedBox(height: 14),
+                              // Total scrap value
+                              _billingRow('${context.t('totalPayout')}', '₹${_totalPayout.toStringAsFixed(0)}', isBold: false),
+                              const SizedBox(height: 6),
+                              // Commission
+                              _billingRow('${context.t('commissionLabel')}', '− ₹${_commission.toStringAsFixed(0)}', color: Colors.orange.shade200),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 10),
+                                child: Divider(color: Colors.white24, thickness: 1),
+                              ),
+                              // Paid to customer (big)
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(context.t('paidToCustomer'), style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+                                  Text('₹${_paidToCustomer.toStringAsFixed(0)}',
+                                    style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900)),
+                                ],
+                              ),
                             ],
                           ),
                         ),
@@ -222,7 +256,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                   child: GradientButton(
-                    label: 'Confirm & Send to Customer',
+                    label: context.t('confirmPickup'),
                     onPressed: _submit,
                     isLoading: _isSubmitting,
                     icon: Icons.send_rounded,
@@ -230,6 +264,16 @@ class _WeighingScreenState extends State<WeighingScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _billingRow(String label, String value, {bool isBold = false, Color? color}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: isBold ? FontWeight.w800 : FontWeight.w500)),
+        Text(value, style: TextStyle(color: color ?? Colors.white, fontSize: 14, fontWeight: isBold ? FontWeight.w900 : FontWeight.w700)),
+      ],
     );
   }
 
@@ -242,28 +286,65 @@ class _WeighingScreenState extends State<WeighingScreen> {
         color: Colors.white, borderRadius: BorderRadius.circular(14),
         boxShadow: AppTheme.subtleShadow,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 3,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(entry.category, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-              const SizedBox(height: 2),
-              Text('₹${entry.total.toStringAsFixed(0)} total', style: TextStyle(fontSize: 11, color: entry.total > 0 ? AppTheme.primary : AppTheme.textHint, fontWeight: FontWeight.w600)),
-            ]),
+          // Category + customer rate badge
+          Row(
+            children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(entry.category, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text('₹${entry.total.toStringAsFixed(0)} total',
+                    style: TextStyle(fontSize: 11, color: entry.total > 0 ? AppTheme.primary : AppTheme.textHint, fontWeight: FontWeight.w600)),
+                ]),
+              ),
+              // Customer rate read-only badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryLight,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                ),
+                child: Column(children: [
+                  Text(context.t('customerRate'), style: const TextStyle(fontSize: 9, color: AppTheme.primaryDark, fontWeight: FontWeight.w600)),
+                  Text('₹${entry.customerRate.toStringAsFixed(0)}/kg',
+                    style: const TextStyle(fontSize: 13, color: AppTheme.primary, fontWeight: FontWeight.w800)),
+                ]),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(flex: 2, child: _numField(entry.weightCtrl, 'e.g. 12', (v) => _updateEntry(i, weight: v))),
-          const SizedBox(width: 8),
-          Expanded(flex: 2, child: _numField(entry.rateCtrl, 'e.g. 15', (v) => _updateEntry(i, rate: v))),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 52,
-            child: Text('₹${entry.total.toStringAsFixed(0)}',
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w800,
-                color: entry.total > 0 ? AppTheme.primary : AppTheme.textHint)),
+          const SizedBox(height: 12),
+          // Weight input row
+          Row(
+            children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(context.t('weight'), style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  _numField(entry.weightCtrl, '0.0', (v) => _updateEntry(i, weight: v)),
+                ]),
+              ),
+              const SizedBox(width: 16),
+              // Total display
+              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Text(context.t('total'), style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: entry.total > 0 ? AppTheme.primaryLight : AppTheme.background,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text('₹${entry.total.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w800,
+                      color: entry.total > 0 ? AppTheme.primary : AppTheme.textHint)),
+                ),
+              ]),
+            ],
           ),
         ],
       ),
@@ -415,7 +496,16 @@ class _WeighingScreenState extends State<WeighingScreen> {
 class _FinalConfirmationScreen extends StatefulWidget {
   final OrderModel order;
   final double payout;
-  const _FinalConfirmationScreen({required this.order, required this.payout});
+  final double commission;
+  final double paidToCustomer;
+  final List<_WeighingEntry> entries;
+  const _FinalConfirmationScreen({
+    required this.order,
+    required this.payout,
+    required this.commission,
+    required this.paidToCustomer,
+    required this.entries,
+  });
 
   @override
   State<_FinalConfirmationScreen> createState() => _FinalConfirmationScreenState();
@@ -439,19 +529,20 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
 
   @override
   Widget build(BuildContext context) {
+    final yourEarnings = widget.payout - widget.commission;
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Spacer(),
+              const SizedBox(height: 20),
+              // Success icon
               ScaleTransition(
                 scale: _scale,
                 child: Container(
-                  width: 110, height: 110,
+                  width: 100, height: 100,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [AppTheme.primary, AppTheme.primaryDark],
@@ -460,38 +551,115 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
                     shape: BoxShape.circle,
                     boxShadow: AppTheme.elevatedShadow,
                   ),
-                  child: const Icon(Icons.check_rounded, size: 56, color: Colors.white),
+                  child: const Icon(Icons.check_rounded, size: 52, color: Colors.white),
                 ),
               ),
-              const SizedBox(height: 28),
-              const Text('Pickup Completed!', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-              const SizedBox(height: 10),
-              const Text('Customer has confirmed the payment.\nYour earnings have been updated.',
+              const SizedBox(height: 20),
+              Text(context.t('pickupComplete'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+              const SizedBox(height: 8),
+              Text(context.t('customerPaidConfirmed'),
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: AppTheme.textSecondary, height: 1.6)),
-              const SizedBox(height: 36),
+                style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary, height: 1.5)),
+              const SizedBox(height: 28),
+
+              // ── Scrap breakdown ───────────────────────────────────────
               Container(
-                padding: const EdgeInsets.all(24),
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryLight,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: AppTheme.subtleShadow,
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('₹${widget.payout.toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primary)),
-                    const SizedBox(height: 4),
-                    const Text('Added to your earnings', style: TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w600, fontSize: 14)),
+                    Row(children: [
+                      const Icon(Icons.recycling_rounded, color: AppTheme.primary, size: 18),
+                      const SizedBox(width: 8),
+                      Text(context.t('scrapBreakdown'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                    ]),
+                    const SizedBox(height: 14),
+                    ...widget.entries.asMap().entries.map((e) {
+                      final entry = e.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(entry.category, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                                Text('${entry.weight.toStringAsFixed(1)} kg × ₹${entry.customerRate.toStringAsFixed(0)}/kg',
+                                  style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                              ]),
+                            ),
+                            Text('₹${entry.total.toStringAsFixed(0)}',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.primary)),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 14),
+
+              // ── Billing summary ───────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF064E3B), Color(0xFF059669)],
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Text(context.t('paymentSummary'), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                    ]),
+                    const SizedBox(height: 14),
+                    _summaryRow(context.t('totalPayout'), '₹${widget.payout.toStringAsFixed(0)}'),
+                    const SizedBox(height: 6),
+                    _summaryRow(context.t('commissionLabel'), '− ₹${widget.commission.toStringAsFixed(0)}', valueColor: Colors.orange.shade200),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Divider(color: Colors.white24, thickness: 1),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(context.t('paidToCustomer'), style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                        Text('₹${widget.paidToCustomer.toStringAsFixed(0)}',
+                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(context.t('yourEarnings'), style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+                          Text('₹${yourEarnings.toStringAsFixed(0)}',
+                            style: const TextStyle(color: Colors.greenAccent, fontSize: 16, fontWeight: FontWeight.w900)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 28),
               GradientButton(
                 label: 'Back to Home',
                 onPressed: () {
-                  // Pushing a new MainScreen and clearing the entire stack guarantees
-                  // we return to the home tab in a clean state, preventing any blank pages.
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const MainScreen()),
                     (route) => false,
@@ -499,10 +667,21 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
                 },
                 icon: Icons.home_rounded,
               ),
+              const SizedBox(height: 16),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value, {Color? valueColor}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+        Text(value, style: TextStyle(color: valueColor ?? Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+      ],
     );
   }
 }

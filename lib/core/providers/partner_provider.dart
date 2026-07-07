@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/partner_model.dart';
+import '../utils/cache_utils.dart';
 import '../services/location_tracking_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
@@ -43,13 +44,28 @@ class PartnerProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // ── Try loading cached partner details locally first ──────────────
+      final prefs = await SharedPreferences.getInstance();
+      final cachedJson = prefs.getString('cached_partner_$uid');
+      if (cachedJson != null) {
+        try {
+          final Map<String, dynamic> data = CacheUtils.decode(cachedJson);
+          _partner = PartnerModel.fromJson(data);
+          _isOnline = _partner.isOnline;
+          // Notify listeners immediately so the UI is populated while Firestore queries
+          notifyListeners();
+        } catch (_) {}
+      }
+
       final doc = await _db.collection('partners').doc(uid).get();
       if (doc.exists && doc.data() != null) {
         _partner = PartnerModel.fromJson(doc.data()!);
         _isOnline = _partner.isOnline;
+        
+        // Cache the fresh profile
+        await prefs.setString('cached_partner_$uid', CacheUtils.encode(doc.data()!));
       }
       // Load saved permission settings
-      final prefs = await SharedPreferences.getInstance();
       final savedAllowed = prefs.getBool('location_allowed') ?? true;
       _locationAllowed = savedAllowed && await _isGpsReady();
       
@@ -72,6 +88,12 @@ class PartnerProvider extends ChangeNotifier {
       if (doc.exists && doc.data() != null) {
         _partner = PartnerModel.fromJson(doc.data()!);
         _isOnline = _partner.isOnline;
+        
+        // Cache the fresh profile updates
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('cached_partner_$uid', CacheUtils.encode(doc.data()!));
+        } catch (_) {}
         
         final prefs = await SharedPreferences.getInstance();
         final savedAllowed = prefs.getBool('location_allowed') ?? true;

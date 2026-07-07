@@ -11,6 +11,8 @@ import '../../../core/widgets/shared_widgets.dart';
 import 'widgets/online_toggle_card.dart';
 import 'widgets/lead_feed_card.dart';
 import 'lead_popup.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/utils/location_utils.dart';
 
 import '../../orders/presentation/order_tracking_screen.dart';
 
@@ -24,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _partner = PartnerProvider();
   final _orders = OrderProvider();
   final _earnings = EarningsProvider();
+  final ScrollController _scrollController = ScrollController();
 
   OrderModel? _incomingOrder;
   bool _leadPopupShown = false;
@@ -62,6 +65,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _earnings.removeListener(_onProviderUpdate);
     _orders.removeListener(_onProviderUpdate);
     _leadsSub?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -238,6 +242,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           _buildAppBar(context),
           SliverToBoxAdapter(child: _buildBody(context)),
@@ -306,7 +311,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     image:
                         _partner.partner.profilePhotoUrl.isNotEmpty
                             ? DecorationImage(
-                              image: NetworkImage(
+                              image: CachedNetworkImageProvider(
                                 _partner.partner.profilePhotoUrl,
                               ),
                               fit: BoxFit.cover,
@@ -346,6 +351,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const SizedBox(height: 4),
 
           if (_shouldShowCommissionDueCard()) _buildCommissionDueCard(),
+
+          if (_orders.reservedOrders.isNotEmpty) _buildScheduledBanner(context),
 
           if (!_partner.locationAllowed)
             Container(
@@ -1140,290 +1147,341 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final diff = order.scheduledDateTime.difference(DateTime.now());
     final canCancel = diff.inMinutes >= 60;
     final isOnline = _partner.isOnline;
+    final categories = order.allScrapCategories;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: AppTheme.subtleShadow,
-        border: Border.all(color: AppTheme.divider.withOpacity(0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
+    // Build human-readable countdown
+    String _countdownLabel() {
+      final now = DateTime.now();
+      final slot = order.scheduledDateTime;
+      final isToday = slot.year == now.year && slot.month == now.month && slot.day == now.day;
+      final isTomorrow = slot.difference(DateTime(now.year, now.month, now.day)).inDays == 1;
+      final hour = slot.hour > 12 ? slot.hour - 12 : (slot.hour == 0 ? 12 : slot.hour);
+      final ampm = slot.hour >= 12 ? 'PM' : 'AM';
+      final min = slot.minute.toString().padLeft(2, '0');
+      final timeStr = '${hour.toString().padLeft(2, '0')}:$min $ampm';
+      if (isToday) return '${context.t('pickupToday')} at $timeStr';
+      if (isTomorrow) return '${context.t('pickupTomorrow')} at $timeStr';
+      return '${slot.day} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][slot.month-1]} at $timeStr';
+    }
+
+    String _diffLabel() {
+      if (diff.isNegative) return context.t('pickupToday');
+      if (diff.inHours > 0) {
+        return '${context.t('pickupIn')} ${diff.inHours}h ${diff.inMinutes.remainder(60)}m';
+      }
+      return '${context.t('pickupIn')} ${diff.inMinutes}m';
+    }
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OrderTrackingScreen(orderId: order.orderId),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppTheme.subtleShadow,
+          border: Border.all(color: const Color(0xFFFDBA74).withOpacity(0.5), width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Top header banner ───────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
                 ),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFFDBA74).withOpacity(0.5),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.bookmark_added_rounded,
-                      size: 12,
-                      color: Color(0xFFEA580C),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(18), topRight: Radius.circular(18)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEA580C).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFEA580C).withOpacity(0.3)),
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      context.t('bookedAndPending'),
-                      style: const TextStyle(
-                        color: Color(0xFFEA580C),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11,
-                        letterSpacing: 0.2,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.calendar_today_rounded, size: 11, color: Color(0xFFEA580C)),
+                      const SizedBox(width: 5),
+                      Text(
+                        context.t('bookedAndPending'),
+                        style: const TextStyle(color: Color(0xFFEA580C), fontWeight: FontWeight.w800, fontSize: 11),
                       ),
+                    ]),
+                  ),
+                  const Spacer(),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text('₹${order.estimatedPayout.toStringAsFixed(0)}',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.primary)),
+                    Text('estimated', style: TextStyle(fontSize: 10, color: AppTheme.textSecondary.withOpacity(0.7))),
+                  ]),
+                ],
+              ),
+            ),
+
+            // ── Body ────────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+
+                  // Countdown chip + time
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: diff.inMinutes < 60
+                            ? const Color(0xFFFEF2F2)
+                            : const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(
+                          Icons.schedule_rounded,
+                          size: 13,
+                          color: diff.inMinutes < 60 ? AppTheme.error : AppTheme.primary,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _diffLabel(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: diff.inMinutes < 60 ? AppTheme.error : AppTheme.primary,
+                          ),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _countdownLabel(),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ]),
+
+                  const SizedBox(height: 12),
+
+                  // Address
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Icon(Icons.location_on_rounded, size: 16, color: AppTheme.error),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        order.customerAddress,
+                        style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ]),
+
+                  const SizedBox(height: 10),
+
+                  // Metadata row: Distance, Weight, and Items count
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildMetadataBadge(
+                          Icons.social_distance_rounded,
+                          '~${LocationUtils.calculateDistance(
+                            _partner.partner.currentLat != 0.0 ? _partner.partner.currentLat : _partner.partner.shopLat,
+                            _partner.partner.currentLng != 0.0 ? _partner.partner.currentLng : _partner.partner.shopLng,
+                            order.customerLat,
+                            order.customerLng,
+                          ).toStringAsFixed(1)} km',
+                          AppTheme.info,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildMetadataBadge(
+                          Icons.scale_rounded,
+                          '~${order.totalEstimatedWeight.toStringAsFixed(0)} kg',
+                          AppTheme.warning,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildMetadataBadge(
+                          Icons.widgets_rounded,
+                          '${order.scrapItems.isNotEmpty ? order.scrapItems.length : order.rawScrapCategories.length} items',
+                          AppTheme.primary,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Scrap category chips
+                  if (categories.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: categories.map((cat) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryLight,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.recycling_rounded, size: 11, color: AppTheme.primary),
+                          const SizedBox(width: 4),
+                          Text(cat, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.primaryDark)),
+                        ]),
+                      )).toList(),
                     ),
                   ],
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '₹${order.estimatedPayout.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.primary,
-                ),
-              ),
-            ],
-          ),
 
-          if (!isOnline) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFFCA5A5).withOpacity(0.5),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.offline_bolt_rounded,
-                    size: 16,
-                    color: AppTheme.error,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      context.t('goOnlineToStart'),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.error,
-                        fontWeight: FontWeight.w600,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.location_on_rounded,
-                size: 16,
-                color: AppTheme.error,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  order.customerAddress,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(
-                Icons.schedule_rounded,
-                size: 16,
-                color: AppTheme.textSecondary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                order.pickupSlot,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              if (canCancel) ...[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _cancelReservedOrderDialog(context, order),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.error,
-                      side: const BorderSide(color: AppTheme.error, width: 1.5),
-                      shape: RoundedRectangleBorder(
+                  if (!isOnline) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFCA5A5).withOpacity(0.5)),
                       ),
-                      minimumSize: const Size(0, 44),
-                    ),
-                    child: Text(
-                      Localizations.localeOf(context).languageCode == 'hi'
-                          ? 'रद्द करें'
-                          : 'Cancel',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-              ],
-              Expanded(
-                flex: canCancel ? 2 : 1,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (!LeadService.instance.isWithinWorkingHours(
-                      _partner.partner,
-                      DateTime.now(),
-                    )) {
-                      AppTheme.showSnack(
-                        context,
-                        'Scheduled pickups can be started only during your working hours.',
-                        isError: true,
-                      );
-                      return;
-                    }
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder:
-                          (_) => const Center(
-                            child: CircularProgressIndicator(
-                              color: AppTheme.primary,
-                            ),
+                      child: Row(children: [
+                        const Icon(Icons.offline_bolt_rounded, size: 16, color: AppTheme.error),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            context.t('goOnlineToStart'),
+                            style: const TextStyle(fontSize: 11, color: AppTheme.error, fontWeight: FontWeight.w600, height: 1.3),
                           ),
-                    );
-                    final ok = await _orders.updateOrderStatus(
-                      order.orderId,
-                      OrderStatus.partnerAssigned,
-                    );
-                    if (mounted) Navigator.pop(context); // close loader
-                    if (ok && mounted) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (_) =>
-                                  OrderTrackingScreen(orderId: order.orderId),
                         ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      ]),
                     ),
-                    minimumSize: const Size(0, 44),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    Localizations.localeOf(context).languageCode == 'hi'
-                        ? 'यात्रा शुरू करें'
-                        : 'Start Trip Now',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (!canCancel) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppTheme.background,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.border.withOpacity(0.5)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.lock_rounded,
-                    size: 14,
-                    color: AppTheme.textSecondary,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      context.t('lockedCannotCancel'),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.textSecondary,
-                        fontWeight: FontWeight.w600,
+                  ],
+
+                  const SizedBox(height: 14),
+
+                  // Action buttons
+                  Row(children: [
+                    if (canCancel) ...[
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _cancelReservedOrderDialog(context, order),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.error,
+                            side: const BorderSide(color: AppTheme.error, width: 1.5),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            minimumSize: const Size(0, 44),
+                          ),
+                          child: Text(
+                            context.t('cancelReservationShort'),
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      flex: canCancel ? 2 : 1,
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF059669), Color(0xFF064E3B)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            if (!LeadService.instance.isWithinWorkingHours(
+                              _partner.partner, DateTime.now())) {
+                              AppTheme.showSnack(context,
+                                'Scheduled pickups can be started only during your working hours.',
+                                isError: true);
+                              return;
+                            }
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => const Center(
+                                child: CircularProgressIndicator(color: AppTheme.primary)),
+                            );
+                            final ok = await _orders.updateOrderStatus(
+                              order.orderId, OrderStatus.partnerAssigned);
+                            if (mounted) Navigator.pop(context); // close loader
+                            if (ok && mounted) {
+                              Navigator.push(context, MaterialPageRoute(
+                                builder: (_) => OrderTrackingScreen(orderId: order.orderId)));
+                            }
+                          },
+                          icon: const Icon(Icons.navigation_rounded, size: 16, color: Colors.white),
+                          label: Text(
+                            context.t('startTripNow'),
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            minimumSize: const Size(0, 44),
+                            elevation: 0,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ]),
+
+                  if (!canCancel) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.border.withOpacity(0.5)),
+                      ),
+                      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        const Icon(Icons.lock_rounded, size: 14, color: AppTheme.textSecondary),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text(
+                          context.t('lockedCannotCancel'),
+                          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w600),
+                        )),
+                      ]),
+                    ),
+                  ],
                 ],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  void _cancelReservedOrderDialog(BuildContext context, OrderModel order) {
+  void _cancelReservedOrderDialog(BuildContext screenContext, OrderModel order) {
     showDialog(
-      context: context,
-      builder: (context) {
+      context: screenContext,
+      builder: (dialogContext) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
           title: Text(
-            context.t('cancelReservation'),
+            screenContext.t('cancelReservation'),
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
           ),
           content: Text(
-            context.t('cancelReservationConfirm'),
+            screenContext.t('cancelReservationConfirm'),
             style: const TextStyle(
               fontSize: 14,
               color: AppTheme.textSecondary,
@@ -1432,9 +1490,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: Text(
-                context.t('goBack'),
+                screenContext.t('goBack'),
                 style: const TextStyle(
                   color: AppTheme.textSecondary,
                   fontWeight: FontWeight.w700,
@@ -1443,9 +1501,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             ElevatedButton(
               onPressed: () async {
-                Navigator.pop(context); // Close dialog
+                Navigator.pop(dialogContext); // Close dialog
                 showDialog(
-                  context: context,
+                  context: screenContext,
                   barrierDismissible: false,
                   builder:
                       (_) => const Center(
@@ -1458,20 +1516,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   final ok = await LeadService.instance.cancelReservedOrder(
                     order,
                   );
-                  if (mounted) Navigator.pop(context); // Close loading
-                  if (ok && mounted) {
+                  // Ignore this order locally to prevent any stream race condition
+                  _declinedOrderIds.add(order.orderId);
+
+                  if (screenContext.mounted) {
+                    Navigator.of(screenContext).pop(); // Close loading
+                  }
+                  if (ok && screenContext.mounted) {
                     AppTheme.showSnack(
-                      context,
-                      Localizations.localeOf(context).languageCode == 'hi'
+                      screenContext,
+                      Localizations.localeOf(screenContext).languageCode == 'hi'
                           ? 'आरक्षण रद्द और पुन: असाइन किया गया।'
                           : 'Reservation cancelled and reassigned.',
                     );
                   }
                 } catch (e) {
-                  if (mounted) Navigator.pop(context); // Close loading
-                  if (mounted) {
+                  if (screenContext.mounted) {
+                    Navigator.of(screenContext).pop(); // Close loading
+                  }
+                  if (screenContext.mounted) {
                     AppTheme.showSnack(
-                      context,
+                      screenContext,
                       e.toString().replaceAll('Exception:', '').trim(),
                       isError: true,
                     );
@@ -1487,7 +1552,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 elevation: 0,
               ),
               child: Text(
-                Localizations.localeOf(context).languageCode == 'hi'
+                Localizations.localeOf(screenContext).languageCode == 'hi'
                     ? 'आरक्षण रद्द करें'
                     : 'Cancel Reservation',
                 style: const TextStyle(fontWeight: FontWeight.w800),
@@ -1496,6 +1561,115 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildScheduledBanner(BuildContext context) {
+    final count = _orders.reservedOrders.length;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFDBA74).withOpacity(0.5), width: 1.5),
+        boxShadow: AppTheme.subtleShadow,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _scrollToScheduledSection,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEA580C).withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.calendar_month_rounded,
+                    color: Color(0xFFEA580C),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        Localizations.localeOf(context).languageCode == 'hi'
+                            ? 'आरक्षित पिकअप असाइन किया गया है'
+                            : 'Scheduled Pickup Assigned',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFEA580C),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        Localizations.localeOf(context).languageCode == 'hi'
+                            ? 'आपके बकेट में $count अनुसूचित ऑर्डर हैं। देखने के लिए टैप करें।'
+                            : 'You have $count scheduled order(s) in your bucket. Tap to view.',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_downward_rounded,
+                  color: Color(0xFFEA580C),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _scrollToScheduledSection() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        350.0,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOutCubic,
+      );
+    }
+  }
+
+  Widget _buildMetadataBadge(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+          ),
+        ],
+      ),
     );
   }
 }

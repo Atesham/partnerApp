@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/order_model.dart';
+import '../utils/cache_utils.dart';
 import '../services/lead_service.dart';
 import '../services/location_tracking_service.dart';
 
@@ -38,6 +40,9 @@ class OrderProvider extends ChangeNotifier {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
+    // Load cached orders first for instant UI response
+    _loadCachedOrders(uid);
+
     _ordersSub?.cancel();
     _ordersSub = _db
         .collection('orders')
@@ -49,8 +54,12 @@ class OrderProvider extends ChangeNotifier {
         )
         .snapshots()
         .listen((snapshot) {
-          final all =
-              snapshot.docs.map((d) => OrderModel.fromJson(d.data())).toList();
+          final all = snapshot.docs
+              .map((d) => OrderModel.fromJson({
+                    ...d.data(),
+                    'orderId': d.id,
+                  }))
+              .toList();
           all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
           _activeOrders = all.where((o) => o.isActive).toList();
@@ -65,6 +74,12 @@ class OrderProvider extends ChangeNotifier {
           _currentOrder = _activeOrders.isNotEmpty ? _activeOrders.first : null;
 
           notifyListeners();
+
+          // Cache the fresh orders list locally
+          SharedPreferences.getInstance().then((prefs) {
+            final jsonList = all.map((o) => o.toJson()).toList();
+            prefs.setString('cached_orders_$uid', CacheUtils.encode(jsonList));
+          }).catchError((_) {});
         });
   }
 
@@ -79,7 +94,10 @@ class OrderProvider extends ChangeNotifier {
         .snapshots()
         .listen((snapshot) {
           for (final doc in snapshot.docs) {
-            final order = OrderModel.fromJson(doc.data());
+            final order = OrderModel.fromJson({
+              ...doc.data(),
+              'orderId': doc.id,
+            });
 
             // Skip if we're already processing this order
             if (_autoAssigning.contains(order.orderId)) continue;
@@ -182,6 +200,23 @@ class OrderProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  Future<void> _loadCachedOrders(String uid) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedJson = prefs.getString('cached_orders_$uid');
+      if (cachedJson != null) {
+        final List<dynamic> list = CacheUtils.decode(cachedJson);
+        final all = list.map((item) => OrderModel.fromJson(item as Map<String, dynamic>)).toList();
+        _activeOrders = all.where((o) => o.isActive).toList();
+        _reservedOrders = all.where((o) => o.status == OrderStatus.reserved).toList();
+        _completedOrders = all.where((o) => o.status == OrderStatus.completed).toList();
+        _cancelledOrders = all.where((o) => o.status == OrderStatus.cancelled).toList();
+        _currentOrder = _activeOrders.isNotEmpty ? _activeOrders.first : null;
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   void reset() {
@@ -311,11 +346,13 @@ class EarningsProvider extends ChangeNotifier {
               .orderBy('completedAt', descending: true)
               .get();
 
-      final orders =
-          snap.docs
-              .map((d) => OrderModel.fromJson(d.data()))
-              .where((o) => o.completedAt != null)
-              .toList();
+      final orders = snap.docs
+          .map((d) => OrderModel.fromJson({
+                ...d.data(),
+                'orderId': d.id,
+              }))
+          .where((o) => o.completedAt != null)
+          .toList();
 
       _todayEarnings = orders
           .where((o) => o.completedAt!.isAfter(todayStart))

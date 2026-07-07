@@ -7,7 +7,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../firebase_options.dart';
-import '../providers/partner_provider.dart';
 import '../models/order_model.dart';
 import '../models/partner_model.dart';
 import 'lead_service.dart';
@@ -43,13 +42,20 @@ class NotificationService {
   StreamSubscription<List<OrderModel>>? _localLeadSub;
   Set<String> _knownOrderIds = {};
 
+  // Scheduled order notification tracker
+  // Watches for newly-assigned reserved orders and fires alerts identical to instant pickup.
+  StreamSubscription<QuerySnapshot>? _scheduledAlertSub;
+  Set<String> _alertedScheduledIds = {};
+
   // Notification Channel configuration for Android 8.0+
+  // Note: Channel ID is incremented to 'v3' to force recreation with the custom sound.
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
-    'scrapwell_leads_channel',
+    'scrapwell_leads_channel_v3',
     'Scrapwell Lead Alerts',
     description: 'High priority ringtone and vibration alerts for pickup leads',
     importance: Importance.max,
     playSound: true,
+    sound: RawResourceAndroidNotificationSound('crisp_fast_two_sec_1_1782943688959_oglrigsj'),
     enableVibration: true,
     showBadge: true,
   );
@@ -135,6 +141,7 @@ class NotificationService {
   }
 
   /// Start listening to the nearby leads stream locally (active online state backup)
+  /// Also starts watching for newly-assigned scheduled orders.
   void startLocalLeadListener(PartnerModel partner) {
     if (partner.uid.isEmpty) return;
     
@@ -174,7 +181,49 @@ class NotificationService {
       debugPrint('Error in NotificationService local lead stream: $err');
     });
     
+    // ── Start scheduled order alert listener ──────────────────────────────
+    _startScheduledOrderAlertListener(partner.uid);
+
     debugPrint('Local lead stream listener started for partner ${partner.uid}');
+  }
+
+  /// Watches Firestore for scheduled orders newly assigned to this partner.
+  /// When detected, fires the same loud notification as instant pickup.
+  void _startScheduledOrderAlertListener(String partnerUid) {
+    if (_scheduledAlertSub != null) return;
+    _scheduledAlertSub?.cancel();
+    _alertedScheduledIds.clear();
+
+    _scheduledAlertSub = FirebaseFirestore.instance
+        .collection('orders')
+        .where('reservedPartnerId', isEqualTo: partnerUid)
+        .where('status', isEqualTo: OrderStatus.reserved.name)
+        .snapshots()
+        .listen((snap) {
+      for (final doc in snap.docs) {
+        final orderId = doc.id.isNotEmpty ? (doc.data()['orderId'] ?? doc.id) as String : doc.id;
+        if (_alertedScheduledIds.contains(orderId)) continue;
+
+        final order = OrderModel.fromJson({...doc.data(), 'orderId': orderId});
+
+        // Only alert for recently assigned orders (within last 10 minutes)
+        final age = DateTime.now().difference(
+          (doc.data()['assignedAt'] as Timestamp?)?.toDate() ?? order.createdAt,
+        );
+        if (age.inMinutes > 10) {
+          _alertedScheduledIds.add(orderId); // Don't alert stale orders
+          continue;
+        }
+
+        _alertedScheduledIds.add(orderId);
+        _showScheduledOrderNotification(order);
+        debugPrint('Scheduled order alert fired for orderId=$orderId');
+      }
+    }, onError: (err) {
+      debugPrint('Error in scheduled order alert listener: $err');
+    });
+
+    debugPrint('Scheduled order alert listener started for partner $partnerUid');
   }
 
   /// Stop listening to the nearby leads stream
@@ -182,6 +231,9 @@ class NotificationService {
     _localLeadSub?.cancel();
     _localLeadSub = null;
     _knownOrderIds.clear();
+    _scheduledAlertSub?.cancel();
+    _scheduledAlertSub = null;
+    _alertedScheduledIds.clear();
     debugPrint('Local lead stream listener stopped.');
   }
 
@@ -249,7 +301,7 @@ class NotificationService {
     }
   }
 
-  /// Show a local notification when a new lead is detected in the stream
+  /// Show a local notification when a new instant lead is detected in the stream
   Future<void> _showLocalLeadNotification(OrderModel order) async {
     final int id = order.orderId.hashCode.remainder(100000);
     final vibrationPattern = Int64List.fromList([0, 800, 350, 800, 350, 1200]);
@@ -261,6 +313,7 @@ class NotificationService {
       importance: _channel.importance,
       priority: Priority.high,
       playSound: true,
+      sound: const RawResourceAndroidNotificationSound('crisp_fast_two_sec_1_1782943688959_oglrigsj'),
       enableVibration: true,
       vibrationPattern: vibrationPattern,
       fullScreenIntent: true,
@@ -276,19 +329,66 @@ class NotificationService {
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        sound: 'crisp_fast_two_sec_1_1782943688959_oglrigsj.wav',
       ),
     );
 
     try {
       await _localNotifications.show(
         id,
-        'New Pickup Lead Alert! 💰',
+        '⚡ New Pickup Lead Alert! 💰',
         'Lead available near ${order.customerAddress}.',
         notificationDetails,
         payload: order.orderId,
       );
     } catch (e) {
       debugPrint('Error showing local lead notification: $e');
+    }
+  }
+
+  /// Show a loud notification when a scheduled order is newly assigned to this partner.
+  /// Uses the same high-priority channel, ringtone, and vibration as instant pickup.
+  Future<void> _showScheduledOrderNotification(OrderModel order) async {
+    final int id = (order.orderId + '_sched').hashCode.remainder(100000);
+    final vibrationPattern = Int64List.fromList([0, 800, 350, 800, 350, 1200]);
+
+    final androidDetails = AndroidNotificationDetails(
+      _channel.id,
+      _channel.name,
+      channelDescription: _channel.description,
+      importance: _channel.importance,
+      priority: Priority.high,
+      playSound: true,
+      sound: const RawResourceAndroidNotificationSound('crisp_fast_two_sec_1_1782943688959_oglrigsj'),
+      enableVibration: true,
+      vibrationPattern: vibrationPattern,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.call,
+      styleInformation: BigTextStyleInformation(
+        'Scheduled pickup assigned for ${order.pickupSlot.isNotEmpty ? order.pickupSlot : "upcoming slot"} at ${order.customerAddress}. Tap to view details.',
+      ),
+    );
+
+    final notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        sound: 'crisp_fast_two_sec_1_1782943688959_oglrigsj.wav',
+      ),
+    );
+
+    try {
+      await _localNotifications.show(
+        id,
+        '📅 Scheduled Pickup Assigned!',
+        'New booking: ${order.pickupSlot.isNotEmpty ? order.pickupSlot : "Scheduled slot"} — ${order.customerAddress}.',
+        notificationDetails,
+        payload: order.orderId,
+      );
+    } catch (e) {
+      debugPrint('Error showing scheduled order notification: $e');
     }
   }
 
@@ -312,6 +412,7 @@ class NotificationService {
       importance: _channel.importance,
       priority: Priority.high,
       playSound: true,
+      sound: const RawResourceAndroidNotificationSound('crisp_fast_two_sec_1_1782943688959_oglrigsj'),
       enableVibration: true,
       vibrationPattern: vibrationPattern,
       fullScreenIntent: true,
@@ -325,6 +426,7 @@ class NotificationService {
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        sound: 'crisp_fast_two_sec_1_1782943688959_oglrigsj.wav',
       ),
     );
 

@@ -79,6 +79,7 @@ class OrderModel {
   final String pickupOtp;
   final String pickupType; // "instant" or "scheduled"
   final String? reservedPartnerId;
+  final List<String> declinedPartnerIds;
 
   const OrderModel({
     required this.orderId,
@@ -109,6 +110,7 @@ class OrderModel {
     this.pickupOtp = '',
     this.pickupType = 'instant',
     this.reservedPartnerId,
+    this.declinedPartnerIds = const [],
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -149,6 +151,7 @@ class OrderModel {
       // Support both pickupType and orderType fields from different app versions
       pickupType: json['pickupType'] ?? json['orderType'] ?? 'instant',
       reservedPartnerId: json['reservedPartnerId'],
+      declinedPartnerIds: List<String>.from(json['declinedPartnerIds'] ?? []),
     );
   }
 
@@ -181,6 +184,7 @@ class OrderModel {
         'pickupOtp': pickupOtp,
         'pickupType': pickupType,
         'reservedPartnerId': reservedPartnerId,
+        'declinedPartnerIds': declinedPartnerIds,
       };
 
   OrderModel copyWith({
@@ -212,6 +216,7 @@ class OrderModel {
     String? pickupOtp,
     String? pickupType,
     String? reservedPartnerId,
+    List<String>? declinedPartnerIds,
   }) {
     return OrderModel(
       orderId: orderId ?? this.orderId,
@@ -242,6 +247,7 @@ class OrderModel {
       pickupOtp: pickupOtp ?? this.pickupOtp,
       pickupType: pickupType ?? this.pickupType,
       reservedPartnerId: reservedPartnerId ?? this.reservedPartnerId,
+      declinedPartnerIds: declinedPartnerIds ?? this.declinedPartnerIds,
     );
   }
 

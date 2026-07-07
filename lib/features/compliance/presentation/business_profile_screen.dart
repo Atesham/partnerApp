@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/partner_provider.dart';
 import '../../../core/models/partner_model.dart';
@@ -60,7 +61,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                 shape: BoxShape.circle,
                                 border: Border.all(color: AppTheme.primary.withOpacity(0.3), width: 2),
                                 image: p.profilePhotoUrl.isNotEmpty
-                                    ? DecorationImage(image: NetworkImage(p.profilePhotoUrl), fit: BoxFit.cover)
+                                    ? DecorationImage(image: CachedNetworkImageProvider(p.profilePhotoUrl), fit: BoxFit.cover)
                                     : null,
                               ),
                               child: p.profilePhotoUrl.isEmpty

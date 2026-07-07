@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/partner_provider.dart';
 import '../../../core/models/partner_model.dart';
@@ -731,7 +732,7 @@ class _VerificationCenterScreenState extends State<VerificationCenterScreen> {
                     image:
                         p.profilePhotoUrl.isNotEmpty
                             ? DecorationImage(
-                              image: NetworkImage(p.profilePhotoUrl),
+                              image: CachedNetworkImageProvider(p.profilePhotoUrl),
                               fit: BoxFit.cover,
                             )
                             : null,
