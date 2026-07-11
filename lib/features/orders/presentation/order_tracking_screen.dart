@@ -9,6 +9,7 @@ import '../../../core/providers/order_provider.dart';
 import '../../../core/models/order_model.dart';
 import '../../../core/widgets/shared_widgets.dart';
 import 'weighing_screen.dart';
+import 'chat_screen.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String orderId;
@@ -110,6 +111,16 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         AppTheme.showSnack(context, 'Could not open maps navigation.', isError: true);
       }
     }
+  }
+
+  void _openChat() {
+    if (_order == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(order: _order!),
+      ),
+    );
   }
 
   @override
@@ -226,13 +237,18 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 _buildScrapCard(order),
                 const SizedBox(height: 14),
                 // Quick actions
-                Row(children: [
-                  Expanded(child: _actionBtn(Icons.call_rounded, context.t('callCustomer'), AppTheme.info, _callCustomer)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _actionBtn(Icons.navigation_rounded, context.t('startNavigation'), AppTheme.primary, _startNavigation)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _actionBtn(Icons.chat_rounded, context.t('support'), AppTheme.warning, _openWhatsAppSupport)),
-                ]),
+                () {
+                  final isHindi = Localizations.localeOf(context).languageCode == 'hi';
+                  return Row(children: [
+                    Expanded(child: _actionBtn(Icons.call_rounded, isHindi ? 'कॉल' : 'Call', AppTheme.info, _callCustomer)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _actionBtn(Icons.navigation_rounded, isHindi ? 'नेविगेट' : 'Navigate', AppTheme.primary, _startNavigation)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _actionBtn(Icons.chat_bubble_rounded, isHindi ? 'चैट' : 'Chat', const Color(0xFF10B981), _openChat)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _actionBtn(Icons.support_agent_rounded, isHindi ? 'सपोर्ट' : 'Support', AppTheme.warning, _openWhatsAppSupport)),
+                  ]);
+                }(),
                 const SizedBox(height: 20),
                 // Status CTA
                 _buildStatusCTA(order),
@@ -458,9 +474,51 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(context.t('scrapDetails'), style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
-            Text('Est. ₹${order.estimatedPayout.toStringAsFixed(0)}',
+            Text('Est. ₹${(order.estimatedPayout - order.tipAmount - order.pickupCharge).toStringAsFixed(0)}',
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.primary)),
           ]),
+          if (order.tipAmount > 0 || order.pickupCharge > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (order.tipAmount > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD1FAE5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '+₹${order.tipAmount.toStringAsFixed(0)} Tip',
+                      style: const TextStyle(
+                        color: Color(0xFF047857),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (order.pickupCharge > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDBEAFE),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '+₹${order.pickupCharge.toStringAsFixed(0)} Pickup Charge',
+                      style: const TextStyle(
+                        color: Color(0xFF1E40AF),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           Wrap(
             spacing: 8, runSpacing: 8,

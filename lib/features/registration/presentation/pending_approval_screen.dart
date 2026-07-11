@@ -145,12 +145,7 @@ class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
                                 const SizedBox(height: 16),
                                 TextButton(
                                   onPressed: () async {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Checking status...'),
-                                        duration: Duration(seconds: 1),
-                                      ),
-                                    );
+                                    AppTheme.showSnack(context, 'Checking status...');
                                     await PartnerProvider().loadPartner();
                                     if (PartnerProvider().isApproved && mounted) {
                                       Navigator.pushReplacement(

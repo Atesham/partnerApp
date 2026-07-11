@@ -197,6 +197,22 @@ class OrderProvider extends ChangeNotifier {
           'updatedAt': FieldValue.serverTimestamp(),
         });
         await LocationTrackingService.instance.markOrderCompleted();
+
+        // ── Update partner totalEarnings and totalOrders atomically ────
+        // We use a transaction so concurrent completions don't race.
+        await _db.runTransaction((tx) async {
+          final partnerRef = _db.collection('partners').doc(uid);
+          final snap = await tx.get(partnerRef);
+          if (!snap.exists) return;
+          final data = snap.data()!;
+          final prevEarnings = (data['totalEarnings'] ?? 0.0).toDouble();
+          final prevOrders = (data['totalOrders'] ?? 0) as int;
+          tx.update(partnerRef, {
+            'totalEarnings': prevEarnings + totalPayout,
+            'totalOrders': prevOrders + 1,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        });
       }
 
       return true;
@@ -206,6 +222,61 @@ class OrderProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  /// Listens to [orderId] for the customer's partnerRating field.
+  /// When the customer rates the partner (writes partnerRating 1-5),
+  /// we compute the new rolling average and write it back to the
+  /// partner's Firestore document. The existing listenToPartner()
+  /// real-time stream then propagates the updated rating to the UI.
+  StreamSubscription<DocumentSnapshot>? listenForPartnerRating(String orderId) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+
+    bool ratingProcessed = false;
+
+    final sub = _db.collection('orders').doc(orderId).snapshots().listen((
+      snap,
+    ) async {
+      if (ratingProcessed) return;
+      final data = snap.data();
+      if (data == null) return;
+
+      final rawRating = data['partnerRating'];
+      if (rawRating == null) return; // customer hasn't rated yet
+
+      final customerRating = (rawRating as num).toDouble();
+      if (customerRating < 1 || customerRating > 5) return;
+
+      ratingProcessed = true; // process only once
+
+      try {
+        await _db.runTransaction((tx) async {
+          final partnerRef = _db.collection('partners').doc(uid);
+          final snap = await tx.get(partnerRef);
+          if (!snap.exists) return;
+          final pData = snap.data()!;
+          final prevRating = (pData['rating'] ?? 0.0).toDouble();
+          final totalRatedOrders = (pData['totalRatedOrders'] ?? 0) as int;
+
+          // Compute rolling average: newAvg = (prevAvg * n + newRating) / (n + 1)
+          final newCount = totalRatedOrders + 1;
+          final newRating =
+              ((prevRating * totalRatedOrders) + customerRating) / newCount;
+
+          tx.update(partnerRef, {
+            'rating': double.parse(newRating.toStringAsFixed(1)),
+            'totalRatedOrders': newCount,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        });
+      } catch (e) {
+        debugPrint('Error updating partner rating: $e');
+      }
+    });
+
+    return sub;
+  }
+
 
   void clearError() {
     _error = null;
@@ -262,7 +333,10 @@ class EarningsProvider extends ChangeNotifier {
   double _walletBalance = 0;
   double _commissionDueBalance = 0;
   DateTime? _commissionDueAt;
+  DateTime? _commissionCycleStartedAt;
   bool _commissionBlocked = false;
+  double _lifetimeEarnings = 0;
+  int _lifetimeOrders = 0;
   String _scrapwellUpiId = 'ateshamali0@okicici';
   String _scrapwellPayeeName = 'Atesham Ali';
   bool _isLoading = false;
@@ -277,7 +351,24 @@ class EarningsProvider extends ChangeNotifier {
   int get monthOrders => _monthOrders;
   double get walletBalance => _walletBalance;
   double get commissionDueBalance => _commissionDueBalance;
-  DateTime? get commissionDueAt => _commissionDueAt;
+  double get lifetimeEarnings => _lifetimeEarnings;
+  int get lifetimeOrders => _lifetimeOrders;
+  DateTime? get commissionDueAt {
+    if (_commissionDueBalance <= 0.01) return null;
+    if (_commissionDueBalance >= 500) {
+      // Over limit: must pay immediately in real time.
+      return DateTime.now().subtract(const Duration(seconds: 1));
+    }
+    // Otherwise, under 500, due on the next Tuesday following the cycle start.
+    final start = _commissionCycleStartedAt ?? _commissionDueAt ?? DateTime.now();
+    int daysToAdd = (DateTime.tuesday - start.weekday) % 7;
+    if (daysToAdd <= 0) {
+      daysToAdd += 7;
+    }
+    return DateTime(start.year, start.month, start.day)
+        .add(Duration(days: daysToAdd))
+        .add(const Duration(hours: 23, minutes: 59, seconds: 59));
+  }
   bool get commissionBlocked => _commissionBlocked;
   String get scrapwellUpiId => _scrapwellUpiId;
   String get scrapwellPayeeName => _scrapwellPayeeName;
@@ -286,7 +377,7 @@ class EarningsProvider extends ChangeNotifier {
       hasCommissionDue &&
       (_commissionBlocked ||
        _commissionDueBalance >= 500 ||
-       (_commissionDueAt != null && DateTime.now().isAfter(_commissionDueAt!)));
+       (commissionDueAt != null && DateTime.now().isAfter(commissionDueAt!)));
   bool get isLoading => _isLoading;
 
   /// Safely notify listeners after the current frame to avoid triggering
@@ -314,7 +405,10 @@ class EarningsProvider extends ChangeNotifier {
       _walletBalance = (data['walletBalance'] ?? 0.0).toDouble();
       _commissionDueBalance = (data['commissionDueBalance'] ?? 0.0).toDouble();
       _commissionDueAt = (data['commissionDueAt'] as Timestamp?)?.toDate();
+      _commissionCycleStartedAt = (data['commissionCycleStartedAt'] as Timestamp?)?.toDate();
       _commissionBlocked = data['commissionBlocked'] ?? false;
+      _lifetimeEarnings = (data['totalEarnings'] ?? 0.0).toDouble();
+      _lifetimeOrders = (data['totalOrders'] ?? 0) as int;
       _safeNotifyListeners();
     });
 
@@ -390,7 +484,11 @@ class EarningsProvider extends ChangeNotifier {
             (partnerDoc.data()?['commissionDueBalance'] ?? 0.0).toDouble();
         _commissionDueAt =
             (partnerDoc.data()?['commissionDueAt'] as Timestamp?)?.toDate();
+        _commissionCycleStartedAt =
+            (partnerDoc.data()?['commissionCycleStartedAt'] as Timestamp?)?.toDate();
         _commissionBlocked = partnerDoc.data()?['commissionBlocked'] ?? false;
+        _lifetimeEarnings = (partnerDoc.data()?['totalEarnings'] ?? 0.0).toDouble();
+        _lifetimeOrders = (partnerDoc.data()?['totalOrders'] ?? 0) as int;
       }
     } catch (_) {}
 
@@ -412,7 +510,10 @@ class EarningsProvider extends ChangeNotifier {
     _walletBalance = 0;
     _commissionDueBalance = 0;
     _commissionDueAt = null;
+    _commissionCycleStartedAt = null;
     _commissionBlocked = false;
+    _lifetimeEarnings = 0;
+    _lifetimeOrders = 0;
     _scrapwellUpiId = 'scrapwell@upi';
     _scrapwellPayeeName = 'Scrapwell';
     notifyListeners();

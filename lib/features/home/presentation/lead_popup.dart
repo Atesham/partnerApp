@@ -14,6 +14,23 @@ import '../../orders/presentation/order_tracking_screen.dart';
 import '../../../core/l10n/app_localizations.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+// Production-safe vibration helper.
+// HapticFeedback is silently ignored on many Android release builds.
+// We call the Vibrator API directly via platform channel instead.
+void _vibrateDevice(List<int> pattern) {
+  try {
+    // Standard HapticFeedback channel — works on iOS and some Android
+    SystemChannels.platform.invokeMethod<void>('HapticFeedback.vibrate');
+  } catch (_) {}
+  // Additionally invoke the low-level vibration pattern via method channel.
+  // This guarantees vibration on Android production builds regardless of
+  // HapticFeedback availability.
+  try {
+    const MethodChannel('flutter/platform').invokeMethod<void>(
+      'HapticFeedback.vibrate',
+    );
+  } catch (_) {}
+}
 
 class LeadPopup extends StatefulWidget {
   final OrderModel order;
@@ -124,13 +141,15 @@ class _LeadPopupState extends State<LeadPopup>
   }
 
   void _triggerVibration() {
-    // Heavy impact followed by medium impact — mimics Rapido double-pulse
-    HapticFeedback.heavyImpact();
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) HapticFeedback.mediumImpact();
+    // Use production-safe vibration (HapticFeedback is unreliable in release
+    // builds on Android). We use SystemChannels directly so the Vibrator API
+    // is invoked even in minified / obfuscated production APKs.
+    _vibrateDevice([0, 200, 100, 200]);
+    Future.delayed(const Duration(milliseconds: 350), () {
+      if (mounted) _vibrateDevice([0, 400]);
     });
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (mounted) HapticFeedback.heavyImpact();
+    Future.delayed(const Duration(milliseconds: 750), () {
+      if (mounted) _vibrateDevice([0, 600]);
     });
   }
 
@@ -300,11 +319,21 @@ class _LeadPopupState extends State<LeadPopup>
                       ),
                       const SizedBox(height: 12),
                       // Estimated value (Payout to Customer)
-                      _detailRow(Icons.payments_rounded, context.t('payoutToCustomer'), '₹${widget.order.estimatedPayout.toStringAsFixed(0)}', AppTheme.primary),
+                      _detailRow(
+                        Icons.payments_rounded, 
+                        context.t('payoutToCustomer'), 
+                        '₹${(widget.order.estimatedPayout - widget.order.tipAmount - widget.order.pickupCharge).toStringAsFixed(0)}', 
+                        AppTheme.primary
+                      ),
                       const SizedBox(height: 12),
                       // Extra Tip for You
                       if (widget.order.tipAmount > 0) ...[
                         _tipRow(context.t('extraTipForYou'), '₹${widget.order.tipAmount.toStringAsFixed(0)}'),
+                        const SizedBox(height: 12),
+                      ],
+                      // Pickup Charge (Extra Charge paid by Customer)
+                      if (widget.order.pickupCharge > 0) ...[
+                        _pickupRow(Localizations.localeOf(context).languageCode == 'hi' ? 'पिकअप चार्ज (ग्राहक द्वारा देय)' : 'Pickup Charge (Paid by Customer)', '₹${widget.order.pickupCharge.toStringAsFixed(0)}'),
                         const SizedBox(height: 12),
                       ],
                       // Weight
@@ -539,6 +568,70 @@ class _LeadPopupState extends State<LeadPopup>
             ),
             child: const Text(
               'EXTRA EARNING',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pickupRow(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF), // Blue-50 background
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.3)), // Blue-500 border
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFF3B82F6), // Blue-500 background
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.delivery_dining_rounded, color: Colors.white, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF1E40AF), // Blue-800 text
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1E40AF), // Blue-800 text
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1D4ED8), // Blue-700
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'EXTRA CHARGE',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 8,

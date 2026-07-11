@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,6 +10,7 @@ import '../../../core/widgets/shared_widgets.dart';
 import '../../../core/services/supabase_storage_service.dart';
 import '../../../core/l10n/app_localizations.dart';
 import '../../main/presentation/main_screen.dart';
+
 
 class WeighingScreen extends StatefulWidget {
   final OrderModel order;
@@ -86,7 +88,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
 
   // Commission = 2% of total payout
   double get _commission => _totalPayout * 0.02;
-  double get _paidToCustomer => _totalPayout - _commission;
+  double get _paidToCustomer => _totalPayout - _commission - widget.order.tipAmount - widget.order.pickupCharge;
 
   Future<void> _submit() async {
     if (_weighingPhoto == null) {
@@ -173,7 +175,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
                             const Icon(Icons.info_outline_rounded, color: AppTheme.primary, size: 18),
                             const SizedBox(width: 10),
                             Expanded(child: Text(
-                              context.t('enterWeights') + '. ' + context.t('customerRate') + ' ' + context.t('originalRate') + '.',
+                              context.t('enterWeights'),
                               style: const TextStyle(color: AppTheme.primaryDark, fontSize: 13, fontWeight: FontWeight.w500))),
                           ]),
                         ),
@@ -229,6 +231,22 @@ class _WeighingScreenState extends State<WeighingScreen> {
                               const SizedBox(height: 6),
                               // Commission
                               _billingRow('${context.t('commissionLabel')}', '− ₹${_commission.toStringAsFixed(0)}', color: Colors.orange.shade200),
+                              if (widget.order.tipAmount > 0) ...[
+                                const SizedBox(height: 6),
+                                _billingRow(
+                                  context.t('extraTipForYou'), 
+                                  '− ₹${widget.order.tipAmount.toStringAsFixed(0)}', 
+                                  color: Colors.green.shade200
+                                ),
+                              ],
+                              if (widget.order.pickupCharge > 0) ...[
+                                const SizedBox(height: 6),
+                                _billingRow(
+                                  Localizations.localeOf(context).languageCode == 'hi' ? 'पिकअप चार्ज' : 'Pickup Charge', 
+                                  '− ₹${widget.order.pickupCharge.toStringAsFixed(0)}', 
+                                  color: Colors.blue.shade200
+                                ),
+                              ],
                               const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 10),
                                 child: Divider(color: Colors.white24, thickness: 1),
@@ -280,75 +298,114 @@ class _WeighingScreenState extends State<WeighingScreen> {
 
   Widget _buildEntry(int i) {
     final entry = _entries[i];
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(14),
-        boxShadow: AppTheme.subtleShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Category + customer rate badge
-          Row(
-            children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(entry.category, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                  const SizedBox(height: 2),
-                  Text('₹${entry.total.toStringAsFixed(0)} total',
-                    style: TextStyle(fontSize: 11, color: entry.total > 0 ? AppTheme.primary : AppTheme.textHint, fontWeight: FontWeight.w600)),
-                ]),
-              ),
-              // Customer rate read-only badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryLight,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
-                ),
-                child: Column(children: [
-                  Text(context.t('customerRate'), style: const TextStyle(fontSize: 9, color: AppTheme.primaryDark, fontWeight: FontWeight.w600)),
-                  Text('₹${entry.customerRate.toStringAsFixed(0)}/kg',
-                    style: const TextStyle(fontSize: 13, color: AppTheme.primary, fontWeight: FontWeight.w800)),
-                ]),
-              ),
-            ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final isNarrow = availableWidth < 340;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: AppTheme.subtleShadow,
+            border: Border.all(color: AppTheme.border.withOpacity(0.5)),
           ),
-          const SizedBox(height: 12),
-          // Weight input row
-          Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(context.t('weight'), style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  _numField(entry.weightCtrl, '0.0', (v) => _updateEntry(i, weight: v)),
-                ]),
-              ),
-              const SizedBox(width: 16),
-              // Total display
-              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text(context.t('total'), style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: entry.total > 0 ? AppTheme.primaryLight : AppTheme.background,
-                    borderRadius: BorderRadius.circular(10),
+              // Category name row
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.recycling_rounded, color: AppTheme.primary, size: 18),
                   ),
-                  child: Text('₹${entry.total.toStringAsFixed(0)}',
-                    style: TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w800,
-                      color: entry.total > 0 ? AppTheme.primary : AppTheme.textHint)),
-                ),
-              ]),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(
+                        entry.category,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                      ),
+                      Text(
+                        '₹${entry.customerRate.toStringAsFixed(0)}/kg',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
+                      ),
+                    ]),
+                  ),
+                  // Live total badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: entry.total > 0 ? AppTheme.primaryLight : AppTheme.background,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '₹${entry.total.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: entry.total > 0 ? AppTheme.primary : AppTheme.textHint,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Weight input — full width
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(
+                        context.t('weight'),
+                        style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      _numField(entry.weightCtrl, '0.0', (v) => _updateEntry(i, weight: v)),
+                    ]),
+                  ),
+                  if (!isNarrow) ...[
+                    const SizedBox(width: 12),
+                    Icon(
+                      Icons.close_rounded,
+                      size: 16,
+                      color: AppTheme.textHint,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '₹${entry.customerRate.toStringAsFixed(0)}/kg',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.drag_handle_rounded,
+                      size: 16,
+                      color: AppTheme.textHint,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '₹${entry.total.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: entry.total > 0 ? AppTheme.primary : AppTheme.textHint,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -516,6 +573,7 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _scale;
+  StreamSubscription<dynamic>? _ratingSub;
 
   @override
   void initState() {
@@ -523,14 +581,25 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
     _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800))..forward();
     _scale = Tween<double>(begin: 0.5, end: 1.0).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
+
+    // Start listening for the customer's partnerRating on this order.
+    // When the customer submits a rating (1-5), the OrderProvider will
+    // compute the rolling average and update the partner document in
+    // Firestore. The existing listenToPartner() stream on the home screen
+    // will then reflect the new rating in real-time without any extra calls.
+    _ratingSub = OrderProvider().listenForPartnerRating(widget.order.orderId);
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ratingSub?.cancel();
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final yourEarnings = widget.payout - widget.commission;
+    final yourEarnings = widget.payout - widget.commission + widget.order.tipAmount + widget.order.pickupCharge;
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
@@ -628,6 +697,22 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
                     _summaryRow(context.t('totalPayout'), '₹${widget.payout.toStringAsFixed(0)}'),
                     const SizedBox(height: 6),
                     _summaryRow(context.t('commissionLabel'), '− ₹${widget.commission.toStringAsFixed(0)}', valueColor: Colors.orange.shade200),
+                    if (widget.order.tipAmount > 0) ...[
+                      const SizedBox(height: 6),
+                      _summaryRow(
+                        context.t('extraTipForYou'), 
+                        '− ₹${widget.order.tipAmount.toStringAsFixed(0)}', 
+                        valueColor: Colors.green.shade200
+                      ),
+                    ],
+                    if (widget.order.pickupCharge > 0) ...[
+                      const SizedBox(height: 6),
+                      _summaryRow(
+                        Localizations.localeOf(context).languageCode == 'hi' ? 'पिकअप चार्ज' : 'Pickup Charge', 
+                        '− ₹${widget.order.pickupCharge.toStringAsFixed(0)}', 
+                        valueColor: Colors.blue.shade200
+                      ),
+                    ],
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 10),
                       child: Divider(color: Colors.white24, thickness: 1),

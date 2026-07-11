@@ -35,6 +35,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _isLeadsLoading = true;
   final Map<String, double> _declinedOrderTipAmounts = {};
 
+  // Auto-redirect tracking: avoid navigating twice to the same order
+  String? _lastAutoNavigatedOrderId;
+
   @override
   void initState() {
     super.initState();
@@ -77,9 +80,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _onProviderUpdate() {
-    if (mounted) {
+    if (!mounted) return;
+    // Defer the rebuild to the next frame to avoid triggering a setState
+    // during the current build/layout phase, which causes scroll jank
+    // and double-slide artifacts on the lead feed list.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       setState(() {});
-    }
+      // ── Auto-redirect for instantly accepted/assigned orders ─────────
+      // When a live Firestore update assigns an instant pickup to this
+      // partner (e.g. via server-side assignment), we auto-navigate to
+      // the OrderTrackingScreen without requiring the partner to tap again.
+      final currentOrder = _orders.currentOrder;
+      if (currentOrder != null &&
+          currentOrder.pickupType == 'instant' &&
+          !_leadPopupShown &&
+          currentOrder.orderId != _lastAutoNavigatedOrderId) {
+        _lastAutoNavigatedOrderId = currentOrder.orderId;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OrderTrackingScreen(orderId: currentOrder.orderId),
+          ),
+        );
+      }
+    });
   }
 
   void _handlePartnerChange() {
@@ -94,9 +119,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _nearbyOrders = [];
       _isLeadsLoading = false;
     }
-    if (mounted) {
-      setState(() {});
-    }
+    // Defer setState to avoid mid-frame rebuilds that cause scroll jank.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _listenToLeads() {
@@ -128,38 +154,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   return true;
                 }).toList();
 
-            setState(() {
-              _nearbyOrders = visibleOrders;
-              _isLeadsLoading = false;
-            });
+            // Defer setState to the next frame to prevent mid-build
+            // calls that cause jank and double-slides in the lead feed.
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              setState(() {
+                _nearbyOrders = visibleOrders;
+                _isLeadsLoading = false;
+              });
 
-            // If popup is shown but the order was taken (no longer in stream), auto-close
-            if (_leadPopupShown && _incomingOrder != null) {
-              final stillAvailable = visibleOrders.any(
-                (o) => o.orderId == _incomingOrder!.orderId,
-              );
-              if (!stillAvailable) {
-                if (Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop();
+              // If popup is shown but the order was taken (no longer in stream), auto-close
+              if (_leadPopupShown && _incomingOrder != null) {
+                final stillAvailable = visibleOrders.any(
+                  (o) => o.orderId == _incomingOrder!.orderId,
+                );
+                if (!stillAvailable) {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  }
+                  setState(() {
+                    _incomingOrder = null;
+                    _leadPopupShown = false;
+                  });
+                  return;
                 }
-                setState(() {
-                  _incomingOrder = null;
-                  _leadPopupShown = false;
-                });
-                return;
               }
-            }
 
-            if (visibleOrders.isEmpty || _leadPopupShown) return;
+              if (visibleOrders.isEmpty || _leadPopupShown) return;
 
-            // Show the nearest unviewed order as a popup
-            final order = visibleOrders.first;
-            if (_incomingOrder?.orderId == order.orderId) return;
-            setState(() {
-              _incomingOrder = order;
-              _leadPopupShown = true;
+              // Show the nearest unviewed order as a popup
+              final order = visibleOrders.first;
+              if (_incomingOrder?.orderId == order.orderId) return;
+              setState(() {
+                _incomingOrder = order;
+                _leadPopupShown = true;
+              });
+              _showLeadPopup(order);
             });
-            _showLeadPopup(order);
           },
           onError: (err) {
             if (mounted) {
@@ -182,7 +213,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           (_) => LeadPopup(
             order: order,
             partner: _partner.partner,
-            onAccepted: () => setState(() => _leadPopupShown = false),
+            onAccepted: () => setState(() {
+              _leadPopupShown = false;
+              // Mark this order as already navigated so the auto-redirect
+              // in _onProviderUpdate does not push a duplicate tracking screen.
+              _lastAutoNavigatedOrderId = order.orderId;
+            }),
             onDeclined:
                 () => setState(() {
                   _declinedOrderTipAmounts[order.orderId] = order.tipAmount;
@@ -563,21 +599,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final balance = _earnings.commissionDueBalance;
     if (balance <= 0.01) return false;
 
-    // DateTime.tuesday is 2 (Monday=1, Tuesday=2 ... Sunday=7)
     final isTuesday = DateTime.now().weekday == DateTime.tuesday;
+    final blocked = _partner.isCommissionBlocked || _earnings.shouldBlockForCommission;
 
-    if (balance >= 500 || isTuesday) {
-      return true;
-    }
-    return false;
+    return balance >= 500 || isTuesday || blocked;
   }
 
   Widget _buildCommissionDueCard() {
+    final isHindi = Localizations.localeOf(context).languageCode == 'hi';
     final dueAt = _earnings.commissionDueAt;
-    final dueText =
-        dueAt == null
+    final dueText = _earnings.commissionDueBalance >= 500
+        ? (isHindi ? 'तुरंत' : 'immediately')
+        : (dueAt == null
             ? context.t('everyTuesday')
-            : 'due by ${dueAt.day}/${dueAt.month}/${dueAt.year}';
+            : (isHindi ? '${dueAt.day}/${dueAt.month}/${dueAt.year} तक' : 'due by ${dueAt.day}/${dueAt.month}/${dueAt.year}'));
+
     final blocked =
         _partner.isCommissionBlocked || _earnings.shouldBlockForCommission;
 
@@ -937,19 +973,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Column(
       children:
           _nearbyOrders
+              .asMap()
+              .entries
               .map(
-                (order) => LeadFeedCard(
-                  order: order,
-                  partner: _partner.partner,
-                  onAccept: () => _showLeadPopup(order),
-                  onIgnore: () {
-                    setState(() {
-                      _declinedOrderTipAmounts[order.orderId] = order.tipAmount;
-                      _nearbyOrders.removeWhere(
-                        (o) => o.orderId == order.orderId,
-                      );
-                    });
-                  },
+                (entry) => RepaintBoundary(
+                  key: ValueKey('lead_${entry.value.orderId}'),
+                  child: LeadFeedCard(
+                    order: entry.value,
+                    partner: _partner.partner,
+                    onAccept: () => _showLeadPopup(entry.value),
+                    onIgnore: () {
+                      setState(() {
+                        _declinedOrderTipAmounts[entry.value.orderId] = entry.value.tipAmount;
+                        _nearbyOrders.removeWhere(
+                          (o) => o.orderId == entry.value.orderId,
+                        );
+                      });
+                    },
+                  ),
                 ),
               )
               .toList(),
@@ -1293,7 +1334,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '₹${order.estimatedPayout.toStringAsFixed(0)}',
+                        '₹${(order.estimatedPayout - order.tipAmount - order.pickupCharge).toStringAsFixed(0)}',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -1322,6 +1363,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             '+₹${order.tipAmount.toStringAsFixed(0)} Tip',
                             style: const TextStyle(
                               color: Color(0xFF047857),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (order.pickupCharge > 0) ...[
+                        const SizedBox(height: 3),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDBEAFE),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '+₹${order.pickupCharge.toStringAsFixed(0)} Charge',
+                            style: const TextStyle(
+                              color: Color(0xFF1E40AF),
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
                             ),

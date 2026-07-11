@@ -81,6 +81,7 @@ class OrderModel {
   final String? reservedPartnerId;
   final Map<String, double> declinedPartners;
   final double tipAmount;
+  final double pickupCharge;
 
   const OrderModel({
     required this.orderId,
@@ -113,6 +114,7 @@ class OrderModel {
     this.reservedPartnerId,
     this.declinedPartners = const {},
     this.tipAmount = 0.0,
+    this.pickupCharge = 0.0,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -159,6 +161,7 @@ class OrderModel {
         ) ?? {}
       ),
       tipAmount: (json['tipAmount'] ?? 0.0).toDouble(),
+      pickupCharge: (json['pickupCharge'] ?? 0.0).toDouble(),
     );
   }
 
@@ -193,6 +196,7 @@ class OrderModel {
         'reservedPartnerId': reservedPartnerId,
         'declinedPartners': declinedPartners,
         'tipAmount': tipAmount,
+        'pickupCharge': pickupCharge,
       };
 
   OrderModel copyWith({
@@ -226,6 +230,7 @@ class OrderModel {
     String? reservedPartnerId,
     Map<String, double>? declinedPartners,
     double? tipAmount,
+    double? pickupCharge,
   }) {
     return OrderModel(
       orderId: orderId ?? this.orderId,
@@ -258,6 +263,7 @@ class OrderModel {
       reservedPartnerId: reservedPartnerId ?? this.reservedPartnerId,
       declinedPartners: declinedPartners ?? this.declinedPartners,
       tipAmount: tipAmount ?? this.tipAmount,
+      pickupCharge: pickupCharge ?? this.pickupCharge,
     );
   }
 

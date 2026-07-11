@@ -265,6 +265,9 @@ class AppTheme {
             ? Icons.check_circle_outline_rounded
             : Icons.info_outline_rounded;
 
+    // Clear any active snackbars to prevent toast queuing/spam when buttons are clicked repeatedly
+    ScaffoldMessenger.of(context).clearSnackBars();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: Colors.white,

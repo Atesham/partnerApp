@@ -139,10 +139,12 @@ class _EarningsScreenState extends State<EarningsScreen> {
   // Period Picker
   // ─────────────────────────────────────────────────────────────
   Widget _buildPeriodPicker() {
+    final isHindi = Localizations.localeOf(context).languageCode == 'hi';
     final periods = [
       context.t('today'),
       context.t('thisWeek'),
       context.t('thisMonth'),
+      isHindi ? 'लाइफटाइम' : 'Lifetime',
     ];
     return Container(
       padding: const EdgeInsets.all(4),
@@ -185,20 +187,26 @@ class _EarningsScreenState extends State<EarningsScreen> {
   // Big Earning Hero Card
   // ─────────────────────────────────────────────────────────────
   Widget _buildBigEarning() {
+    final isHindi = Localizations.localeOf(context).languageCode == 'hi';
     final value = _selectedPeriod == 0
         ? _earnings.todayEarnings
         : _selectedPeriod == 1
             ? _earnings.weekEarnings
-            : _earnings.monthEarnings;
+            : _selectedPeriod == 2
+                ? _earnings.monthEarnings
+                : _earnings.lifetimeEarnings;
     final orders = _selectedPeriod == 0
         ? _earnings.todayOrders
         : _selectedPeriod == 1
             ? _earnings.weekOrders
-            : _earnings.monthOrders;
+            : _selectedPeriod == 2
+                ? _earnings.monthOrders
+                : _earnings.lifetimeOrders;
     final periodLabels = [
       context.t('today'),
       context.t('thisWeek'),
       context.t('thisMonth'),
+      isHindi ? 'लाइफटाइम' : 'Lifetime',
     ];
     final periodLabel = periodLabels[_selectedPeriod];
 
@@ -478,10 +486,13 @@ class _EarningsScreenState extends State<EarningsScreen> {
   // Commission Due Card — Primary Focus
   // ─────────────────────────────────────────────────────────────
   Widget _buildCommissionDueCard() {
+    final isHindi = Localizations.localeOf(context).languageCode == 'hi';
     final dueAt = _earnings.commissionDueAt;
-    final dueText = dueAt == null
-        ? context.t('everyTuesday')
-        : '${dueAt.day}/${dueAt.month}/${dueAt.year}';
+    final dueText = _earnings.commissionDueBalance >= 500
+        ? (isHindi ? 'तुरंत' : 'immediately')
+        : (dueAt == null
+            ? context.t('everyTuesday')
+            : '${dueAt.day}/${dueAt.month}/${dueAt.year}');
     final blocked = _earnings.shouldBlockForCommission;
     final hasDue = _earnings.hasCommissionDue;
 

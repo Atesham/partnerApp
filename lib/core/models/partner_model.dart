@@ -418,10 +418,29 @@ class PartnerModel {
   bool get isPending => status == PartnerStatus.pending;
   bool get hasCommissionDue => commissionDueBalance > 0.01;
   bool get isCommissionOverLimit => commissionDueBalance >= 500;
+  
+  DateTime? get dynamicCommissionDueAt {
+    if (commissionDueBalance <= 0.01) return null;
+    if (commissionDueBalance >= 500) {
+      // Over limit: must pay immediately in real time.
+      return DateTime.now().subtract(const Duration(seconds: 1));
+    }
+    // Otherwise, under 500, due on the next Tuesday following the cycle start.
+    final start = commissionCycleStartedAt ?? commissionDueAt ?? DateTime.now();
+    int daysToAdd = (DateTime.tuesday - start.weekday) % 7;
+    if (daysToAdd <= 0) {
+      daysToAdd += 7;
+    }
+    return DateTime(start.year, start.month, start.day)
+        .add(Duration(days: daysToAdd))
+        .add(const Duration(hours: 23, minutes: 59, seconds: 59));
+  }
+
   bool get isCommissionOverdue =>
       hasCommissionDue &&
-      commissionDueAt != null &&
-      DateTime.now().isAfter(commissionDueAt!);
+      dynamicCommissionDueAt != null &&
+      DateTime.now().isAfter(dynamicCommissionDueAt!);
+
   bool get shouldBlockForCommission =>
       hasCommissionDue && (commissionBlocked || isCommissionOverLimit || isCommissionOverdue);
   String get displayName => fullName.isNotEmpty ? fullName : 'Partner';

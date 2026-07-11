@@ -151,7 +151,7 @@ class _LeadFeedCardState extends State<LeadFeedCard>
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              '₹${widget.order.estimatedPayout.toStringAsFixed(0)}',
+                              '₹${(widget.order.estimatedPayout - widget.order.tipAmount - widget.order.pickupCharge).toStringAsFixed(0)}',
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
@@ -177,6 +177,24 @@ class _LeadFeedCardState extends State<LeadFeedCard>
                                   '+₹${widget.order.tipAmount.toStringAsFixed(0)} Tip',
                                   style: const TextStyle(
                                     color: Color(0xFF047857),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (widget.order.pickupCharge > 0) ...[
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDBEAFE),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '+₹${widget.order.pickupCharge.toStringAsFixed(0)} Charge',
+                                  style: const TextStyle(
+                                    color: Color(0xFF1E40AF),
                                     fontSize: 10,
                                     fontWeight: FontWeight.w800,
                                   ),

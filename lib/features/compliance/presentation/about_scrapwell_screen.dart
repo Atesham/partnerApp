@@ -142,14 +142,6 @@ class AboutScrapwellScreen extends StatelessWidget {
                       label: isHindi ? 'पंजीकृत पता' : 'Registered Address',
                       value: 'Sec 10A, Gurgaon, Haryana - 122001',
                     ),
-                    const Divider(height: 20, color: AppTheme.divider),
-                    _buildRow(
-                      label:
-                          isHindi
-                              ? 'कॉर्पोरेट पहचान संख्या (CIN)'
-                              : 'Corporate ID (CIN)',
-                      value: 'U38110HR2026PTC118542',
-                    ),
                   ],
                 ),
               ),
