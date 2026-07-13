@@ -1,7 +1,7 @@
 name: scrapwell_partner
 description: "Scrapwell Partner - Scrap shop owner app for receiving and managing pickup leads"
 publish_to: 'none'
-version: 1.0.0+8
+version: 1.0.0+9
 environment:
   sdk: ^3.7.2
 
