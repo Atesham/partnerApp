@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:scrapwell_partner/core/services/location_tracking_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/l10n/app_localizations.dart';
@@ -72,46 +74,55 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  void _safeSetState(VoidCallback fn) {
+    if (!mounted) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(fn);
+        }
+      });
+    } else {
+      setState(fn);
+    }
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _partner.refreshLocationAvailability();
+    } else if (state == AppLifecycleState.detached) {
+      // Stop background location service & set Firestore status offline immediately on app kill
+      LocationTrackingService.instance.stopTracking();
+      _partner.toggleOnline(false);
     }
   }
 
   void _onProviderUpdate() {
-    if (!mounted) return;
-    // Defer the rebuild to the next frame to avoid triggering a setState
-    // during the current build/layout phase, which causes scroll jank
-    // and double-slide artifacts on the lead feed list.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {});
-      // ── Auto-redirect for instantly accepted/assigned orders ─────────
-      // When a live Firestore update assigns an instant pickup to this
-      // partner (e.g. via server-side assignment), we auto-navigate to
-      // the OrderTrackingScreen without requiring the partner to tap again.
-      final currentOrder = _orders.currentOrder;
-      if (currentOrder != null &&
-          currentOrder.pickupType == 'instant' &&
-          !_leadPopupShown &&
-          currentOrder.orderId != _lastAutoNavigatedOrderId) {
-        _lastAutoNavigatedOrderId = currentOrder.orderId;
+    _safeSetState(() {});
+
+    // Auto-redirect navigation logic (must be run outside layout/paint phase)
+    final currentOrder = _orders.currentOrder;
+    if (currentOrder != null &&
+        currentOrder.pickupType == 'instant' &&
+        !_leadPopupShown &&
+        currentOrder.orderId != _lastAutoNavigatedOrderId) {
+      _lastAutoNavigatedOrderId = currentOrder.orderId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => OrderTrackingScreen(orderId: currentOrder.orderId),
           ),
         );
-      }
-    });
+      });
+    }
   }
 
   void _handlePartnerChange() {
     if (_partner.isOnline) {
-      // Always restart the stream when partner data changes so that
-      // radius updates (maxDistanceKm) and live location updates are
-      // immediately reflected in the broadcast filter.
       _listenToLeads();
     } else {
       _leadsSub?.cancel();
@@ -119,10 +130,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _nearbyOrders = [];
       _isLeadsLoading = false;
     }
-    // Defer setState to avoid mid-frame rebuilds that cause scroll jank.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() {});
-    });
+    _safeSetState(() {});
   }
 
   void _listenToLeads() {
@@ -154,14 +162,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   return true;
                 }).toList();
 
-            // Defer setState to the next frame to prevent mid-build
-            // calls that cause jank and double-slides in the lead feed.
+            // Set state immediately to avoid any delay
+            _safeSetState(() {
+              _nearbyOrders = visibleOrders;
+              _isLeadsLoading = false;
+            });
+
+            // Handle bottom sheet trigger safely in post-frame callback
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted) return;
-              setState(() {
-                _nearbyOrders = visibleOrders;
-                _isLeadsLoading = false;
-              });
 
               // If popup is shown but the order was taken (no longer in stream), auto-close
               if (_leadPopupShown && _incomingOrder != null) {
@@ -172,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
                   }
-                  setState(() {
+                  _safeSetState(() {
                     _incomingOrder = null;
                     _leadPopupShown = false;
                   });
@@ -185,7 +194,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               // Show the nearest unviewed order as a popup
               final order = visibleOrders.first;
               if (_incomingOrder?.orderId == order.orderId) return;
-              setState(() {
+              _safeSetState(() {
                 _incomingOrder = order;
                 _leadPopupShown = true;
               });
@@ -193,11 +202,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             });
           },
           onError: (err) {
-            if (mounted) {
-              setState(() {
-                _isLeadsLoading = false;
-              });
-            }
+            _safeSetState(() {
+              _isLeadsLoading = false;
+            });
           },
         );
   }
@@ -213,12 +220,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           (_) => LeadPopup(
             order: order,
             partner: _partner.partner,
-            onAccepted: () => setState(() {
-              _leadPopupShown = false;
-              // Mark this order as already navigated so the auto-redirect
-              // in _onProviderUpdate does not push a duplicate tracking screen.
-              _lastAutoNavigatedOrderId = order.orderId;
-            }),
+            onAccepted:
+                () => setState(() {
+                  _leadPopupShown = false;
+                  // Mark this order as already navigated so the auto-redirect
+                  // in _onProviderUpdate does not push a duplicate tracking screen.
+                  _lastAutoNavigatedOrderId = order.orderId;
+                }),
             onDeclined:
                 () => setState(() {
                   _declinedOrderTipAmounts[order.orderId] = order.tipAmount;
@@ -282,12 +290,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: CustomScrollView(
+      body: Scrollbar(
         controller: _scrollController,
-        slivers: [
-          _buildAppBar(context),
-          SliverToBoxAdapter(child: _buildBody(context)),
-        ],
+        thickness: 6,
+        radius: const Radius.circular(3),
+        interactive: true,
+        child: CustomScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            _buildAppBar(context),
+            SliverToBoxAdapter(child: _buildBody(context)),
+          ],
+        ),
       ),
     );
   }
@@ -600,7 +617,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (balance <= 0.01) return false;
 
     final isTuesday = DateTime.now().weekday == DateTime.tuesday;
-    final blocked = _partner.isCommissionBlocked || _earnings.shouldBlockForCommission;
+    final blocked =
+        _partner.isCommissionBlocked || _earnings.shouldBlockForCommission;
 
     return balance >= 500 || isTuesday || blocked;
   }
@@ -608,11 +626,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildCommissionDueCard() {
     final isHindi = Localizations.localeOf(context).languageCode == 'hi';
     final dueAt = _earnings.commissionDueAt;
-    final dueText = _earnings.commissionDueBalance >= 500
-        ? (isHindi ? 'तुरंत' : 'immediately')
-        : (dueAt == null
-            ? context.t('everyTuesday')
-            : (isHindi ? '${dueAt.day}/${dueAt.month}/${dueAt.year} तक' : 'due by ${dueAt.day}/${dueAt.month}/${dueAt.year}'));
+    final dueText =
+        _earnings.commissionDueBalance >= 500
+            ? (isHindi ? 'तुरंत' : 'immediately')
+            : (dueAt == null
+                ? context.t('everyTuesday')
+                : (isHindi
+                    ? '${dueAt.day}/${dueAt.month}/${dueAt.year} तक'
+                    : 'due by ${dueAt.day}/${dueAt.month}/${dueAt.year}'));
 
     final blocked =
         _partner.isCommissionBlocked || _earnings.shouldBlockForCommission;
@@ -984,7 +1005,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     onAccept: () => _showLeadPopup(entry.value),
                     onIgnore: () {
                       setState(() {
-                        _declinedOrderTipAmounts[entry.value.orderId] = entry.value.tipAmount;
+                        _declinedOrderTipAmounts[entry.value.orderId] =
+                            entry.value.tipAmount;
                         _nearbyOrders.removeWhere(
                           (o) => o.orderId == entry.value.orderId,
                         );

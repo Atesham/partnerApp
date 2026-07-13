@@ -134,9 +134,15 @@ class LocationTrackingService {
 
     _positionSub = Geolocator.getPositionStream(
       locationSettings: selectedSettings,
-    ).listen((Position position) {
-      _uploadLocation(position);
-    }, onError: (_) {});
+    ).listen(
+      (Position position) {
+        _uploadLocation(position);
+      },
+      onError: (error) {
+        stopTracking();
+        PartnerProvider().refreshLocationAvailability();
+      },
+    );
   }
 
   LocationSettings _getPlatformSettings(

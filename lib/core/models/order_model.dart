@@ -74,7 +74,10 @@ class OrderModel {
   final String? cancellationReason;
   final DateTime createdAt;
   final DateTime? assignedAt;
+  final DateTime? partnerArrivedAt;
+  final DateTime? pickupStartedAt;
   final DateTime? completedAt;
+  final DateTime? cancelledAt;
   final DateTime? expiresAt;
   final String pickupOtp;
   final String pickupType; // "instant" or "scheduled"
@@ -107,7 +110,10 @@ class OrderModel {
     this.cancellationReason,
     required this.createdAt,
     this.assignedAt,
+    this.partnerArrivedAt,
+    this.pickupStartedAt,
     this.completedAt,
+    this.cancelledAt,
     this.expiresAt,
     this.pickupOtp = '',
     this.pickupType = 'instant',
@@ -149,7 +155,10 @@ class OrderModel {
       cancellationReason: json['cancellationReason'],
       createdAt: (json['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       assignedAt: (json['assignedAt'] as Timestamp?)?.toDate(),
+      partnerArrivedAt: (json['partnerArrivedAt'] as Timestamp?)?.toDate(),
+      pickupStartedAt: (json['pickupStartedAt'] as Timestamp?)?.toDate(),
       completedAt: (json['completedAt'] as Timestamp?)?.toDate(),
+      cancelledAt: (json['cancelledAt'] as Timestamp?)?.toDate() ?? (json['status'] == 'cancelled' ? (json['updatedAt'] as Timestamp?)?.toDate() : null),
       expiresAt: (json['expiresAt'] as Timestamp?)?.toDate(),
       pickupOtp: json['otp']?.toString() ?? json['pickupOtp']?.toString() ?? '',
       // Support both pickupType and orderType fields from different app versions
@@ -189,7 +198,10 @@ class OrderModel {
         'cancellationReason': cancellationReason,
         'createdAt': Timestamp.fromDate(createdAt),
         'assignedAt': assignedAt != null ? Timestamp.fromDate(assignedAt!) : null,
+        'partnerArrivedAt': partnerArrivedAt != null ? Timestamp.fromDate(partnerArrivedAt!) : null,
+        'pickupStartedAt': pickupStartedAt != null ? Timestamp.fromDate(pickupStartedAt!) : null,
         'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
+        'cancelledAt': cancelledAt != null ? Timestamp.fromDate(cancelledAt!) : null,
         'expiresAt': expiresAt != null ? Timestamp.fromDate(expiresAt!) : null,
         'pickupOtp': pickupOtp,
         'pickupType': pickupType,
@@ -223,7 +235,10 @@ class OrderModel {
     String? cancellationReason,
     DateTime? createdAt,
     DateTime? assignedAt,
+    DateTime? partnerArrivedAt,
+    DateTime? pickupStartedAt,
     DateTime? completedAt,
+    DateTime? cancelledAt,
     DateTime? expiresAt,
     String? pickupOtp,
     String? pickupType,
@@ -256,7 +271,10 @@ class OrderModel {
       cancellationReason: cancellationReason ?? this.cancellationReason,
       createdAt: createdAt ?? this.createdAt,
       assignedAt: assignedAt ?? this.assignedAt,
+      partnerArrivedAt: partnerArrivedAt ?? this.partnerArrivedAt,
+      pickupStartedAt: pickupStartedAt ?? this.pickupStartedAt,
       completedAt: completedAt ?? this.completedAt,
+      cancelledAt: cancelledAt ?? this.cancelledAt,
       expiresAt: expiresAt ?? this.expiresAt,
       pickupOtp: pickupOtp ?? this.pickupOtp,
       pickupType: pickupType ?? this.pickupType,

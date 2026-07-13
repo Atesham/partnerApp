@@ -294,39 +294,67 @@ class _EarningsScreenState extends State<EarningsScreen> {
   // Stats 2×2 Grid
   // ─────────────────────────────────────────────────────────────
   Widget _buildStatsGrid() {
+    final isHindi = Localizations.localeOf(context).languageCode == 'hi';
+    final periodLabels = [
+      context.t('today'),
+      context.t('thisWeek'),
+      context.t('thisMonth'),
+      isHindi ? 'लाइफटाइम' : 'Lifetime',
+    ];
+    final periodLabel = periodLabels[_selectedPeriod];
+
+    final earningsVal = _selectedPeriod == 0
+        ? _earnings.todayEarnings
+        : _selectedPeriod == 1
+            ? _earnings.weekEarnings
+            : _selectedPeriod == 2
+                ? _earnings.monthEarnings
+                : _earnings.lifetimeEarnings;
+
+    final ordersVal = _selectedPeriod == 0
+        ? _earnings.todayOrders
+        : _selectedPeriod == 1
+            ? _earnings.weekOrders
+            : _selectedPeriod == 2
+                ? _earnings.monthOrders
+                : _earnings.lifetimeOrders;
+
+    final avgPerOrderVal = ordersVal > 0 ? earningsVal / ordersVal : 0.0;
+
     final stats = [
       _StatItem(
-        icon: Icons.today_rounded,
-        label: context.t('todayEarningsLabel'),
-        value: '₹${_earnings.todayEarnings.toStringAsFixed(0)}',
+        icon: Icons.payments_rounded,
+        label: isHindi ? '$periodLabel की कमाई' : '$periodLabel Earnings',
+        value: '₹${earningsVal.toStringAsFixed(0)}',
         color: AppTheme.primary,
       ),
       _StatItem(
-        icon: Icons.calendar_view_week_rounded,
-        label: context.t('weekEarningsLabel'),
-        value: '₹${_earnings.weekEarnings.toStringAsFixed(0)}',
+        icon: Icons.inventory_2_rounded,
+        label: isHindi ? '$periodLabel के पिकअप' : '$periodLabel Pickups',
+        value: '$ordersVal',
         color: AppTheme.info,
       ),
       _StatItem(
-        icon: Icons.inventory_2_rounded,
-        label: context.t('todayOrdersLabel'),
-        value: '${_earnings.todayOrders}',
+        icon: Icons.trending_up_rounded,
+        label: isHindi ? 'औसत प्रति पिकअप' : 'Avg. per Pickup',
+        value: '₹${avgPerOrderVal.toStringAsFixed(0)}',
         color: AppTheme.warning,
       ),
       _StatItem(
-        icon: Icons.bar_chart_rounded,
-        label: context.t('weekOrdersLabel'),
-        value: '${_earnings.weekOrders}',
+        icon: Icons.account_balance_wallet_rounded,
+        label: isHindi ? 'वॉलेट बैलेंस' : 'Wallet Balance',
+        value: '₹${_earnings.walletBalance.toStringAsFixed(0)}',
         color: const Color(0xFF8B5CF6),
       ),
     ];
+
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
-      childAspectRatio: 1.55,
+      childAspectRatio: 1.5,
       children: stats
           .map(
             (s) => Container(
@@ -348,21 +376,29 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     child: Icon(s.icon, color: s.color, size: 16),
                   ),
                   const Spacer(),
-                  Text(
-                    s.value,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: s.color,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      s.value,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: s.color,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    s.label,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textSecondary,
-                      fontWeight: FontWeight.w600,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      s.label,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -377,9 +413,33 @@ class _EarningsScreenState extends State<EarningsScreen> {
   // Performance Section
   // ─────────────────────────────────────────────────────────────
   Widget _buildPerformanceSection() {
-    final avgPerOrder = _earnings.weekOrders > 0
-        ? _earnings.weekEarnings / _earnings.weekOrders
-        : 0.0;
+    final isHindi = Localizations.localeOf(context).languageCode == 'hi';
+    final periodLabels = [
+      context.t('today'),
+      context.t('thisWeek'),
+      context.t('thisMonth'),
+      isHindi ? 'लाइफटाइम' : 'Lifetime',
+    ];
+    final periodLabel = periodLabels[_selectedPeriod];
+
+    final earningsVal = _selectedPeriod == 0
+        ? _earnings.todayEarnings
+        : _selectedPeriod == 1
+            ? _earnings.weekEarnings
+            : _selectedPeriod == 2
+                ? _earnings.monthEarnings
+                : _earnings.lifetimeEarnings;
+
+    final ordersVal = _selectedPeriod == 0
+        ? _earnings.todayOrders
+        : _selectedPeriod == 1
+            ? _earnings.weekOrders
+            : _selectedPeriod == 2
+                ? _earnings.monthOrders
+                : _earnings.lifetimeOrders;
+
+    final avgPerOrderVal = ordersVal > 0 ? earningsVal / ordersVal : 0.0;
+    final glanceTitle = isHindi ? '$periodLabel एक नज़र में' : '$periodLabel at a Glance';
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -395,7 +455,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                context.t('weekAtGlance'),
+                glanceTitle,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
@@ -410,7 +470,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  context.t('weekly'),
+                  periodLabel,
                   style: const TextStyle(
                     color: AppTheme.primary,
                     fontSize: 11,
@@ -424,21 +484,21 @@ class _EarningsScreenState extends State<EarningsScreen> {
           _performanceRow(
             Icons.payments_rounded,
             context.t('avgPerPickup'),
-            '₹${avgPerOrder.toStringAsFixed(0)}',
+            '₹${avgPerOrderVal.toStringAsFixed(0)}',
             AppTheme.primary,
           ),
           const Divider(height: 20, color: AppTheme.divider),
           _performanceRow(
             Icons.inventory_2_rounded,
             context.t('totalPickups'),
-            '${_earnings.weekOrders} ${context.t('ordersText')}',
+            '$ordersVal ${context.t('ordersText')}',
             AppTheme.info,
           ),
           const Divider(height: 20, color: AppTheme.divider),
           _performanceRow(
             Icons.account_balance_wallet_rounded,
             context.t('totalEarned'),
-            '₹${_earnings.weekEarnings.toStringAsFixed(0)}',
+            '₹${earningsVal.toStringAsFixed(0)}',
             AppTheme.success,
           ),
         ],
@@ -498,74 +558,106 @@ class _EarningsScreenState extends State<EarningsScreen> {
 
     // Colour scheme: red if blocked, amber if due, green if clear
     final Color accentColor = blocked
-        ? AppTheme.error
+        ? const Color(0xFFDC2626) // Deep Tailwind Red
         : hasDue
-            ? AppTheme.warning
-            : AppTheme.success;
+            ? const Color(0xFFD97706) // Deep Tailwind Amber
+            : const Color(0xFF059669); // Deep Tailwind Green
+
     final Color bgColor = blocked
         ? const Color(0xFFFEF2F2)
         : hasDue
             ? const Color(0xFFFFFBEB)
-            : AppTheme.primaryLight;
+            : const Color(0xFFECFDF5);
+
     final IconData headerIcon = blocked
-        ? Icons.lock_clock_rounded
+        ? Icons.error_outline_rounded
         : hasDue
-            ? Icons.receipt_long_rounded
-            : Icons.check_circle_rounded;
+            ? Icons.pending_actions_rounded
+            : Icons.task_alt_rounded;
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppTheme.subtleShadow,
-        border: Border.all(color: accentColor.withOpacity(0.25), width: 1.5),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withOpacity(0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+        border: Border.all(color: accentColor.withOpacity(0.18), width: 1.5),
       ),
-      child: Column(
-        children: [
-          // ── Status Banner ───────────────────────────────────
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            decoration: BoxDecoration(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          children: [
+            // ── Status Banner ───────────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               color: bgColor,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(19),
-                topRight: Radius.circular(19),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(headerIcon, color: accentColor, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    blocked
-                        ? context.t('accountBlocked')
-                        : hasDue
-                            ? context.t('commissionPending')
-                            : context.t('commissionClear'),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: accentColor,
+              child: Row(
+                children: [
+                  Icon(headerIcon, color: accentColor, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      blocked
+                          ? context.t('accountBlocked')
+                          : hasDue
+                              ? context.t('commissionPending')
+                              : context.t('commissionClear'),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: accentColor,
+                        letterSpacing: 0.1,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  // Status Badge Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      blocked
+                          ? (isHindi ? 'ब्लॉक' : 'Blocked')
+                          : hasDue
+                              ? (isHindi ? 'लंबित' : 'Due')
+                              : (isHindi ? 'क्लियर' : 'Clear'),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: accentColor,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // ── Amount + Details ────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Due amount hero
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: Column(
+            // ── Amount + Details ────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Due amount hero row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
@@ -573,132 +665,205 @@ class _EarningsScreenState extends State<EarningsScreen> {
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppTheme.textSecondary,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Text(
                             '₹${_earnings.commissionDueBalance.toStringAsFixed(0)}',
                             style: TextStyle(
-                              fontSize: 36,
+                              fontSize: 34,
                               fontWeight: FontWeight.w900,
-                              color: hasDue
-                                  ? accentColor
-                                  : AppTheme.textPrimary,
+                              color: hasDue ? accentColor : AppTheme.textPrimary,
+                              letterSpacing: -0.5,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: accentColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        hasDue ? context.t('payNow') : context.t('clearText'),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: accentColor,
-                          letterSpacing: 0.8,
+                      if (hasDue)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: accentColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.payment_rounded, size: 14, color: accentColor),
+                              const SizedBox(width: 4),
+                              Text(
+                                context.t('payNow'),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: accentColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF059669)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Clear',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF059669),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 18),
+                  const Divider(height: 1, color: AppTheme.divider),
+                  const SizedBox(height: 18),
+
+                  // Info details grid/rows
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFF3F4F6)),
                     ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-                const Divider(height: 1, color: AppTheme.divider),
-                const SizedBox(height: 14),
-
-                // Info rows
-                _infoRow(Icons.percent_rounded, context.t('commissionRate'),
-                    context.t('commissionRateValue')),
-                const SizedBox(height: 10),
-                _infoRow(Icons.calendar_today_rounded, context.t('payBy'), dueText),
-                const SizedBox(height: 10),
-                _infoRow(Icons.account_balance_rounded, context.t('upiId'),
-                    _earnings.scrapwellUpiId),
-
-                const SizedBox(height: 18),
-
-                // Pay button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed:
-                        hasDue ? _payCommission : null,
-                    icon: const Icon(Icons.payment_rounded, size: 18),
-                    label: Text(
-                      hasDue
-                          ? context.t('payViaUpi').replaceAll('{amount}', _earnings.commissionDueBalance.toStringAsFixed(0))
-                          : context.t('nothingToPay'),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: accentColor,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor:
-                          AppTheme.primary.withOpacity(0.3),
-                      disabledForegroundColor: Colors.white70,
-                      elevation: 0,
-                      minimumSize: const Size(0, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13),
-                      ),
+                    child: Column(
+                      children: [
+                        _infoRow(
+                          Icons.percent_rounded,
+                          context.t('commissionRate'),
+                          context.t('commissionRateValue'),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8.0),
+                          child: Divider(height: 1, color: Color(0xFFE5E7EB)),
+                        ),
+                        _infoRow(
+                          Icons.calendar_today_rounded,
+                          context.t('payBy'),
+                          dueText,
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8.0),
+                          child: Divider(height: 1, color: Color(0xFFE5E7EB)),
+                        ),
+                        _infoRow(
+                          Icons.account_balance_rounded,
+                          context.t('upiId'),
+                          _earnings.scrapwellUpiId,
+                        ),
+                      ],
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 8),
+                  const SizedBox(height: 20),
 
-                // WhatsApp confirm button (only shown when due)
-                if (hasDue)
+                  // Pay button
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _confirmCommissionOnWhatsApp,
-                      icon: const Icon(Icons.chat_rounded, size: 18),
-                      label: Text(context.t('alreadyPaidWhatsapp')),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primary,
-                        side: const BorderSide(color: AppTheme.primary),
-                        minimumSize: const Size(0, 46),
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: hasDue ? _payCommission : null,
+                      icon: const Icon(Icons.payment_rounded, size: 18, color: Colors.white),
+                      label: Text(
+                        hasDue
+                            ? context.t('payViaUpi').replaceAll('{amount}', _earnings.commissionDueBalance.toStringAsFixed(0))
+                            : context.t('nothingToPay'),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentColor,
+                        elevation: 0,
+                        shadowColor: Colors.transparent,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(13),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                     ),
                   ),
 
-                if (hasDue) const SizedBox(height: 12),
-
-                // Footnote
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.info_outline_rounded,
-                        size: 13, color: AppTheme.textHint),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        context.t('upiPaymentNote'),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.textHint,
-                          height: 1.4,
-                          fontWeight: FontWeight.w500,
+                  if (hasDue) ...[
+                    const SizedBox(height: 10),
+                    // WhatsApp confirm button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        onPressed: _confirmCommissionOnWhatsApp,
+                        icon: const Icon(Icons.chat_rounded, size: 18),
+                        label: Text(
+                          context.t('alreadyPaidWhatsapp'),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.primary,
+                          side: const BorderSide(color: AppTheme.primary, width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
                       ),
                     ),
                   ],
-                ),
-              ],
+
+                  const SizedBox(height: 14),
+
+                  // Footnote note banner
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6).withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          size: 14,
+                          color: AppTheme.textHint,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            context.t('upiPaymentNote'),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textHint,
+                              height: 1.4,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/providers/partner_provider.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/services/in_app_update_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../language/presentation/language_selection_screen.dart';
 import '../../main/presentation/main_screen.dart';
@@ -45,6 +46,16 @@ class _SplashScreenState extends State<SplashScreen> {
       final route = results[1];
       if (route is Widget) {
         _push(route);
+
+        // After navigating, trigger an in-app update check in the background.
+        // The check is fire-and-forget: it won't block or delay navigation.
+        // If an update is available, the Play Store downloads it silently and
+        // a snackbar appears on the new screen prompting the user to restart.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            InAppUpdateService.instance.checkForUpdate(context);
+          }
+        });
       }
     } catch (e) {
       if (mounted) {
