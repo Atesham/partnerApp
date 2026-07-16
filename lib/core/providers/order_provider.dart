@@ -25,6 +25,7 @@ class OrderProvider extends ChangeNotifier {
   String? _error;
   StreamSubscription<QuerySnapshot>? _ordersSub;
   StreamSubscription<QuerySnapshot>? _scheduledSub;
+  StreamSubscription<QuerySnapshot>? _partnerCancellationsSub;
   final Set<String> _autoAssigning = {}; // guard against duplicate triggers
   DateTime? _lastOrdersCacheWriteTime;
   int _lastActiveOrdersCount = 0;
@@ -44,6 +45,26 @@ class OrderProvider extends ChangeNotifier {
 
     // Load cached orders first for instant UI response
     _loadCachedOrders(uid);
+
+    List<OrderModel> dbCancelledOrders = [];
+    List<OrderModel> mainCancelledOrders = [];
+
+    void updateCancelledOrdersList() {
+      final combined = [
+        ...mainCancelledOrders,
+        ...dbCancelledOrders,
+      ];
+      final seenIds = <String>{};
+      final unique = <OrderModel>[];
+      for (final o in combined) {
+        if (!seenIds.contains(o.orderId)) {
+          seenIds.add(o.orderId);
+          unique.add(o);
+        }
+      }
+      unique.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _cancelledOrders = unique;
+    }
 
     _ordersSub?.cancel();
     _ordersSub = _db
@@ -69,8 +90,10 @@ class OrderProvider extends ChangeNotifier {
               all.where((o) => o.status == OrderStatus.reserved).toList();
           _completedOrders =
               all.where((o) => o.status == OrderStatus.completed).toList();
-          _cancelledOrders =
+          
+          mainCancelledOrders =
               all.where((o) => o.status == OrderStatus.cancelled).toList();
+          updateCancelledOrdersList();
 
           // Current active order (first partner-assigned or higher)
           _currentOrder = _activeOrders.isNotEmpty ? _activeOrders.first : null;
@@ -90,6 +113,24 @@ class OrderProvider extends ChangeNotifier {
               prefs.setString('cached_orders_$uid', CacheUtils.encode(jsonList));
             }).catchError((_) {});
           }
+        });
+
+    _partnerCancellationsSub?.cancel();
+    _partnerCancellationsSub = _db
+        .collection('partners')
+        .doc(uid)
+        .collection('cancelled_orders')
+        .snapshots()
+        .listen((snapshot) {
+          dbCancelledOrders = snapshot.docs
+              .map((d) => OrderModel.fromJson({
+                    ...d.data(),
+                    'orderId': d.id,
+                    'status': 'cancelled',
+                  }))
+              .toList();
+          updateCancelledOrdersList();
+          notifyListeners();
         });
   }
 
@@ -112,10 +153,8 @@ class OrderProvider extends ChangeNotifier {
             // Skip if we're already processing this order
             if (_autoAssigning.contains(order.orderId)) continue;
 
-            // Only trigger for orders created recently (within the last 5 minutes)
-            // to avoid re-processing stale unassigned orders on app resume.
-            final age = DateTime.now().difference(order.createdAt);
-            if (age.inMinutes > 5) continue;
+            // Skip if the scheduled pickup time has already passed by more than 60 minutes.
+            if (DateTime.now().difference(order.scheduledDateTime).inMinutes > 60) continue;
 
             _autoAssigning.add(order.orderId);
             LeadService.instance
@@ -175,6 +214,7 @@ class OrderProvider extends ChangeNotifier {
     List<ScrapItem> items,
     double totalPayout, {
     String? weighingPhotoUrl,
+    double effectivePickupCharge = 0.0,
   }) async {
     try {
       final Map<String, dynamic> updateData = {
@@ -183,6 +223,8 @@ class OrderProvider extends ChangeNotifier {
         'status': OrderStatus.completed.name,
         'customerConfirmed': true,
         'completedAt': FieldValue.serverTimestamp(),
+        // Write the effective pickup charge back (may differ from original if waived)
+        'pickupCharge': effectivePickupCharge,
       };
       if (weighingPhotoUrl != null) {
         updateData['weighingPhotoUrl'] = weighingPhotoUrl;
@@ -198,8 +240,9 @@ class OrderProvider extends ChangeNotifier {
         });
         await LocationTrackingService.instance.markOrderCompleted();
 
-        // ── Update partner totalEarnings and totalOrders atomically ────
+        // ── Update partner totalEarnings, totalOrders, and commission atomically ────
         // We use a transaction so concurrent completions don't race.
+        final commission = totalPayout * 0.02;
         await _db.runTransaction((tx) async {
           final partnerRef = _db.collection('partners').doc(uid);
           final snap = await tx.get(partnerRef);
@@ -207,11 +250,34 @@ class OrderProvider extends ChangeNotifier {
           final data = snap.data()!;
           final prevEarnings = (data['totalEarnings'] ?? 0.0).toDouble();
           final prevOrders = (data['totalOrders'] ?? 0) as int;
-          tx.update(partnerRef, {
+          final prevCommission = (data['commissionDueBalance'] ?? 0.0).toDouble();
+          final prevCycleStart = data['commissionCycleStartedAt'];
+
+          // Compute next Tuesday from today for commissionDueAt
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          int daysUntilTuesday = (DateTime.tuesday - today.weekday) % 7;
+          if (daysUntilTuesday == 0) daysUntilTuesday = 7; // today IS Tuesday, go to next week
+          final nextTuesdayEOD = today
+              .add(Duration(days: daysUntilTuesday))
+              .add(const Duration(hours: 23, minutes: 59, seconds: 59));
+
+          final Map<String, dynamic> partnerUpdates = {
             'totalEarnings': prevEarnings + totalPayout,
             'totalOrders': prevOrders + 1,
+            // Accumulate commission due balance
+            'commissionDueBalance': prevCommission + commission,
+            // commissionDueAt = always next upcoming Tuesday
+            'commissionDueAt': Timestamp.fromDate(nextTuesdayEOD),
             'updatedAt': FieldValue.serverTimestamp(),
-          });
+          };
+
+          // Set cycle start only when first commission in this cycle (prev was 0)
+          if (prevCommission <= 0.01 || prevCycleStart == null) {
+            partnerUpdates['commissionCycleStartedAt'] = FieldValue.serverTimestamp();
+          }
+
+          tx.update(partnerRef, partnerUpdates);
         });
       }
 
@@ -305,6 +371,8 @@ class OrderProvider extends ChangeNotifier {
     _ordersSub = null;
     _scheduledSub?.cancel();
     _scheduledSub = null;
+    _partnerCancellationsSub?.cancel();
+    _partnerCancellationsSub = null;
     _autoAssigning.clear();
     _activeOrders = [];
     _reservedOrders = []; // was missing — caused stale orders after logout
@@ -359,14 +427,14 @@ class EarningsProvider extends ChangeNotifier {
       // Over limit: must pay immediately in real time.
       return DateTime.now().subtract(const Duration(seconds: 1));
     }
-    // Otherwise, under 500, due on the next Tuesday following the cycle start.
-    final start = _commissionCycleStartedAt ?? _commissionDueAt ?? DateTime.now();
-    int daysToAdd = (DateTime.tuesday - start.weekday) % 7;
-    if (daysToAdd <= 0) {
-      daysToAdd += 7;
-    }
-    return DateTime(start.year, start.month, start.day)
-        .add(Duration(days: daysToAdd))
+    // Always compute next upcoming Tuesday from TODAY (not from cycle start)
+    // This ensures the date is always current and never stale.
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    int daysUntilTuesday = (DateTime.tuesday - todayDate.weekday) % 7;
+    if (daysUntilTuesday == 0) daysUntilTuesday = 7; // today IS Tuesday -> show next Tuesday
+    return todayDate
+        .add(Duration(days: daysUntilTuesday))
         .add(const Duration(hours: 23, minutes: 59, seconds: 59));
   }
   bool get commissionBlocked => _commissionBlocked;
@@ -396,14 +464,33 @@ class EarningsProvider extends ChangeNotifier {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
+    double? _prevCommissionBalance;
+
     _partnerWalletSub?.cancel();
     _partnerWalletSub = _db.collection('partners').doc(uid).snapshots().listen((
       doc,
-    ) {
+    ) async {
       final data = doc.data();
       if (data == null) return;
+      final newBalance = (data['commissionDueBalance'] ?? 0.0).toDouble();
+
+      // Detect balance transition from >0 → 0 (admin cleared it)
+      // When this happens, reset commissionCycleStartedAt so next cycle starts fresh
+      if (_prevCommissionBalance != null && _prevCommissionBalance! > 0.01 && newBalance <= 0.01) {
+        // Admin set commissionBalance to 0 — reset the cycle start so the next
+        // commission accrual starts a fresh Tuesday cycle
+        try {
+          await _db.collection('partners').doc(uid).update({
+            'commissionCycleStartedAt': FieldValue.delete(),
+            'commissionDueAt': FieldValue.delete(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        } catch (_) {}
+      }
+      _prevCommissionBalance = newBalance;
+
       _walletBalance = (data['walletBalance'] ?? 0.0).toDouble();
-      _commissionDueBalance = (data['commissionDueBalance'] ?? 0.0).toDouble();
+      _commissionDueBalance = newBalance;
       _commissionDueAt = (data['commissionDueAt'] as Timestamp?)?.toDate();
       _commissionCycleStartedAt = (data['commissionCycleStartedAt'] as Timestamp?)?.toDate();
       _commissionBlocked = data['commissionBlocked'] ?? false;

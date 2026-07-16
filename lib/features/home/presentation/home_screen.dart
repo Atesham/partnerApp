@@ -39,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   // Auto-redirect tracking: avoid navigating twice to the same order
   String? _lastAutoNavigatedOrderId;
+  double? _tempRadius;
 
   @override
   void initState() {
@@ -100,7 +101,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _onProviderUpdate() {
-    _safeSetState(() {});
+    _safeSetState(() {
+      if (_tempRadius != null && (_partner.partner.maxDistanceKm - _tempRadius!).abs() < 0.1) {
+        _tempRadius = null;
+      }
+    });
 
     // Auto-redirect navigation logic (must be run outside layout/paint phase)
     final currentOrder = _orders.currentOrder;
@@ -122,6 +127,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _handlePartnerChange() {
+    _safeSetState(() {
+      if (_tempRadius != null && (_partner.partner.maxDistanceKm - _tempRadius!).abs() < 0.1) {
+        _tempRadius = null;
+      }
+    });
     if (_partner.isOnline) {
       _listenToLeads();
     } else {
@@ -130,7 +140,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _nearbyOrders = [];
       _isLeadsLoading = false;
     }
-    _safeSetState(() {});
   }
 
   void _listenToLeads() {
@@ -880,7 +889,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildRadiusSelector(BuildContext context) {
-    final currentRadius = _partner.partner.maxDistanceKm;
+    final currentRadius = _tempRadius ?? _partner.partner.maxDistanceKm;
     final isOnline = _partner.isOnline;
 
     return Container(
@@ -942,12 +951,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               max: 30.0,
               divisions: 5,
               label: '${currentRadius.toStringAsFixed(0)} km',
-              onChanged:
-                  isOnline
-                      ? (value) async {
-                        await _partner.updateSearchRadius(value);
-                      }
-                      : null,
+              onChanged: isOnline
+                  ? (value) {
+                      setState(() {
+                        _tempRadius = value;
+                      });
+                    }
+                  : null,
+              onChangeEnd: isOnline
+                  ? (value) async {
+                      // Trigger Firebase write on drag end to prevent layout jerking
+                      await _partner.updateSearchRadius(value);
+                    }
+                  : null,
             ),
           ),
           Padding(
@@ -1004,6 +1020,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     partner: _partner.partner,
                     onAccept: () => _showLeadPopup(entry.value),
                     onIgnore: () {
+                      LeadService.instance.declineLead(entry.value.orderId, entry.value.tipAmount);
                       setState(() {
                         _declinedOrderTipAmounts[entry.value.orderId] =
                             entry.value.tipAmount;
@@ -1352,68 +1369,93 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ),
                   const Spacer(),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '₹${(order.estimatedPayout - order.tipAmount - order.pickupCharge).toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                      Text(
-                        'estimated',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                      if (order.tipAmount > 0) ...[
-                        const SizedBox(height: 3),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
+                  Builder(builder: (ctx) {
+                    // Apply the same dynamic pickup charge logic as weighing screen:
+                    // Pickup charge is waived when estimated payout >= ₹100
+                    const double pickupThreshold = 100.0;
+                    final effectivePickup = order.estimatedPayout >= pickupThreshold
+                        ? 0.0
+                        : order.pickupCharge;
+                    // paidToCustomer estimate - always >= 0
+                    final estimatedNet = (order.estimatedPayout - effectivePickup).clamp(0.0, double.infinity);
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '₹${estimatedNet.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.primary,
                           ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFD1FAE5),
-                            borderRadius: BorderRadius.circular(6),
+                        ),
+                        Text(
+                          Localizations.localeOf(context).languageCode == 'hi'
+                              ? 'अनुमानित'
+                              : 'estimated',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.textSecondary,
                           ),
-                          child: Text(
-                            '+₹${order.tipAmount.toStringAsFixed(0)} Tip',
-                            style: const TextStyle(
-                              color: Color(0xFF047857),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
+                        ),
+                        if (order.tipAmount > 0) ...[
+                          const SizedBox(height: 3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD1FAE5),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '+₹${order.tipAmount.toStringAsFixed(0)} Tip',
+                              style: const TextStyle(
+                                color: Color(0xFF047857),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                      if (order.pickupCharge > 0) ...[
-                        const SizedBox(height: 3),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDBEAFE),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '+₹${order.pickupCharge.toStringAsFixed(0)} Charge',
-                            style: const TextStyle(
-                              color: Color(0xFF1E40AF),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
+                        ],
+                        // Only show pickup charge badge if it actually applies
+                        if (effectivePickup > 0) ...[
+                          const SizedBox(height: 3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDBEAFE),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '-₹${effectivePickup.toStringAsFixed(0)} Charge',
+                              style: const TextStyle(
+                                color: Color(0xFF1E40AF),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
-                        ),
+                        ] else if (order.pickupCharge > 0) ...[
+                          // Pickup charge was waived because payout >= ₹100
+                          const SizedBox(height: 3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD1FAE5),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'No Charge ✓',
+                              style: TextStyle(
+                                color: Color(0xFF047857),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
+                    );
+                  }),
                 ],
               ),
             ),

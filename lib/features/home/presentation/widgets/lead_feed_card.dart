@@ -147,62 +147,86 @@ class _LeadFeedCardState extends State<LeadFeedCard>
                             ],
                           ),
                         ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '₹${(widget.order.estimatedPayout - widget.order.tipAmount - widget.order.pickupCharge).toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.primary,
-                              ),
-                            ),
-                            const Text(
-                              'est. payout',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                            if (widget.order.tipAmount > 0) ...[
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFD1FAE5),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '+₹${widget.order.tipAmount.toStringAsFixed(0)} Tip',
-                                  style: const TextStyle(
-                                    color: Color(0xFF047857),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
+                            Builder(builder: (ctx) {
+                              const double pickupThreshold = 100.0;
+                              final effectivePickup = widget.order.estimatedPayout >= pickupThreshold
+                                  ? 0.0
+                                  : widget.order.pickupCharge;
+                              final estimatedNet = (widget.order.estimatedPayout - effectivePickup).clamp(0.0, double.infinity);
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '₹${estimatedNet.toStringAsFixed(0)}',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.primary,
+                                    ),
                                   ),
-                                ),
-                              ),
-                            ],
-                            if (widget.order.pickupCharge > 0) ...[
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDBEAFE),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '+₹${widget.order.pickupCharge.toStringAsFixed(0)} Charge',
-                                  style: const TextStyle(
-                                    color: Color(0xFF1E40AF),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
+                                  const Text(
+                                    'est. payout',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: AppTheme.textSecondary,
+                                    ),
                                   ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+                                  if (widget.order.tipAmount > 0) ...[
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFD1FAE5),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '+₹${widget.order.tipAmount.toStringAsFixed(0)} Tip',
+                                        style: const TextStyle(
+                                          color: Color(0xFF047857),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  if (effectivePickup > 0) ...[
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDBEAFE),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        '-₹${effectivePickup.toStringAsFixed(0)} Charge',
+                                        style: const TextStyle(
+                                          color: Color(0xFF1E40AF),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ] else if (widget.order.pickupCharge > 0) ...[
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFD1FAE5),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text(
+                                        'No Charge ✓',
+                                        style: TextStyle(
+                                          color: Color(0xFF047857),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            }),
                       ],
                     ),
 

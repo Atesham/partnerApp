@@ -363,8 +363,17 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       final orderRef = db.collection('orders').doc(order.orderId);
       final partnerRef = db.collection('partners').doc(uid);
       final liveLocRef = db.collection('live_locations').doc(uid);
+      final partnerCancelRef = db
+          .collection('partners')
+          .doc(uid)
+          .collection('cancelled_orders')
+          .doc(order.orderId);
 
       // 1. Release the order back to searchingPartner in Firestore
+      //    CRITICAL: Also write declinedPartners.$uid so the same partner never
+      //    sees this order again (unless the customer raises the tip).
+      //    This is the Zepto/Zomato captain-app model: decline/cancel = blacklisted
+      //    at this tip level, only re-notified if tip increases.
       batch.update(orderRef, {
         'status': OrderStatus.searchingPartner.name,
         'cancellationReason': reason,
@@ -376,17 +385,41 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         'assignedAt': null,
         'updatedAt': FieldValue.serverTimestamp(),
         'expiresAt': Timestamp.fromDate(DateTime.now().add(const Duration(minutes: 2))),
+        // Blacklist this partner at the current tip level:
+        'declinedPartners.$uid': order.tipAmount,
       });
 
-      // 2. Mark the partner as available in partners collection
+      // 2. Write the cancelled order to the partner's subcollection
+      batch.set(partnerCancelRef, {
+        'orderId': order.orderId,
+        'customerId': order.customerId,
+        'customerName': order.customerName,
+        'customerPhone': order.customerPhone,
+        'customerAddress': order.customerAddress,
+        'customerLat': order.customerLat,
+        'customerLng': order.customerLng,
+        'areaName': order.areaName,
+        'estimatedPayout': order.estimatedPayout,
+        'tipAmount': order.tipAmount,
+        'pickupCharge': order.pickupCharge,
+        'pickupType': order.pickupType,
+        'pickupSlot': order.pickupSlot,
+        'createdAt': Timestamp.fromDate(order.createdAt),
+        'cancelledAt': FieldValue.serverTimestamp(),
+        'cancellationReason': reason,
+        'status': OrderStatus.cancelled.name,
+      });
+
+      // 3. Also remove this order from partner's reservedSlots in case it was
+      //    a scheduled order that got accepted (partnerAssigned state).
       batch.update(partnerRef, {
         'isAvailable': true,
         'updatedAt': FieldValue.serverTimestamp(),
+        'totalCancelledOrders': FieldValue.increment(1),
       });
 
-      // 3. CRITICAL: Also restore availability in live_locations so the partner
-      //    immediately re-enters the instant pickup broadcast pool.
-      //    Without this, the partner stays "on another order" indefinitely.
+      // 4. Restore availability in live_locations so the partner immediately
+      //    re-enters the instant pickup broadcast pool.
       batch.set(
         liveLocRef,
         {
@@ -396,6 +429,29 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         },
         SetOptions(merge: true),
       );
+
+      // 4. Also remove from reservedSlots if this was a scheduled order
+      //    (the partner may have had it in their calendar)
+      try {
+        final partnerSnap = await db.collection('partners').doc(uid).get();
+        if (partnerSnap.exists) {
+          final data = partnerSnap.data()!;
+          final slots = (data['reservedSlots'] as List<dynamic>? ?? []);
+          final updatedSlots = slots.where((s) {
+            final slotMap = s as Map<dynamic, dynamic>;
+            return slotMap['orderId']?.toString() != order.orderId;
+          }).toList();
+          if (updatedSlots.length != slots.length) {
+            // Only update if slots actually changed
+            await db.collection('partners').doc(uid).update({
+              'reservedSlots': updatedSlots,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      } catch (_) {
+        // Non-critical: best effort to clean up calendar
+      }
 
       await batch.commit();
 

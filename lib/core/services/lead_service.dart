@@ -408,7 +408,7 @@ class LeadService {
           nextSnap = await tx.get(_db.collection('partners').doc(nextPartner.uid));
         }
 
-        // Remove from current partner's calendar
+        // Remove from current partner's calendar & increment cancellation count
         if (currentPartnerSnap.exists) {
           final currentData =
               PartnerModel.fromJson(currentPartnerSnap.data()!);
@@ -418,8 +418,35 @@ class LeadService {
           tx.update(currentPartnerRef, {
             'reservedSlots': updatedSlots.map((s) => s.toJson()).toList(),
             'updatedAt': FieldValue.serverTimestamp(),
+            'totalCancelledOrders': FieldValue.increment(1),
           });
         }
+
+        // Store copy in partner's cancelled_orders subcollection
+        final partnerCancelRef = _db
+            .collection('partners')
+            .doc(uid)
+            .collection('cancelled_orders')
+            .doc(order.orderId);
+        tx.set(partnerCancelRef, {
+          'orderId': order.orderId,
+          'customerId': order.customerId,
+          'customerName': order.customerName,
+          'customerPhone': order.customerPhone,
+          'customerAddress': order.customerAddress,
+          'customerLat': order.customerLat,
+          'customerLng': order.customerLng,
+          'areaName': order.areaName,
+          'estimatedPayout': order.estimatedPayout,
+          'tipAmount': order.tipAmount,
+          'pickupCharge': order.pickupCharge,
+          'pickupType': order.pickupType,
+          'pickupSlot': order.pickupSlot,
+          'createdAt': Timestamp.fromDate(order.createdAt),
+          'cancelledAt': FieldValue.serverTimestamp(),
+          'cancellationReason': 'Cancelled reservation prior to pickup window',
+          'status': OrderStatus.cancelled.name,
+        });
 
         if (nextPartner != null) {
           // Reassign to next partner
@@ -476,10 +503,16 @@ class LeadService {
     }
   }
 
-  /// Decline an instant lead (UI dismiss only — no DB write needed for broadcast model)
-  void declineLead(String orderId) {
-    // Declinations are UI-only — the order stays open for other partners.
-    // Could log to analytics if needed.
+  /// Decline an instant lead in Firestore so this partner is blacklisted
+  /// from seeing it again unless the tip amount is increased.
+  Future<void> declineLead(String orderId, double currentTipAmount) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      await _db.collection('orders').doc(orderId).update({
+        'declinedPartners.$uid': currentTipAmount,
+      });
+    } catch (_) {}
   }
 
   // ────────────────────────────────────────────────────────────────────────────

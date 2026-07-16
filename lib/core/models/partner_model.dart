@@ -55,6 +55,7 @@ class PartnerModel {
   final double currentLng;
   final double totalEarnings;
   final int totalOrders;
+  final int totalCancelledOrders;
   final double rating;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -110,6 +111,7 @@ class PartnerModel {
     this.currentLng = 0.0,
     this.totalEarnings = 0.0,
     this.totalOrders = 0,
+    this.totalCancelledOrders = 0,
     this.rating = 0.0,
     required this.createdAt,
     required this.updatedAt,
@@ -159,6 +161,7 @@ class PartnerModel {
         commissionDueBalance: 0.0,
         commissionTotalBilled: 0.0,
         commissionBlocked: false,
+        totalCancelledOrders: 0,
       );
 
   factory PartnerModel.fromJson(Map<String, dynamic> json) {
@@ -196,6 +199,7 @@ class PartnerModel {
       maxDistanceKm: (json['maxDistanceKm'] ?? 15.0).toDouble(),
       totalEarnings: double.tryParse(json['totalEarnings']?.toString() ?? '0') ?? 0.0,
       totalOrders: (json['totalOrders'] ?? 0),
+      totalCancelledOrders: (json['totalCancelledOrders'] ?? 0),
       rating: double.tryParse(json['rating']?.toString() ?? '0') ?? 0.0,
       createdAt: (json['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (json['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -258,6 +262,7 @@ class PartnerModel {
       'maxDistanceKm': maxDistanceKm,
       'totalEarnings': totalEarnings,
       'totalOrders': totalOrders,
+      'totalCancelledOrders': totalCancelledOrders,
       'rating': rating,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
@@ -322,6 +327,7 @@ class PartnerModel {
     double? currentLng,
     double? totalEarnings,
     int? totalOrders,
+    int? totalCancelledOrders,
     double? rating,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -375,6 +381,7 @@ class PartnerModel {
       currentLng: currentLng ?? this.currentLng,
       totalEarnings: totalEarnings ?? this.totalEarnings,
       totalOrders: totalOrders ?? this.totalOrders,
+      totalCancelledOrders: totalCancelledOrders ?? this.totalCancelledOrders,
       rating: rating ?? this.rating,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -425,14 +432,13 @@ class PartnerModel {
       // Over limit: must pay immediately in real time.
       return DateTime.now().subtract(const Duration(seconds: 1));
     }
-    // Otherwise, under 500, due on the next Tuesday following the cycle start.
-    final start = commissionCycleStartedAt ?? commissionDueAt ?? DateTime.now();
-    int daysToAdd = (DateTime.tuesday - start.weekday) % 7;
-    if (daysToAdd <= 0) {
-      daysToAdd += 7;
-    }
-    return DateTime(start.year, start.month, start.day)
-        .add(Duration(days: daysToAdd))
+    // Always compute next upcoming Tuesday from TODAY (never stale from cycle start)
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    int daysUntilTuesday = (DateTime.tuesday - todayDate.weekday) % 7;
+    if (daysUntilTuesday == 0) daysUntilTuesday = 7; // today IS Tuesday -> next week
+    return todayDate
+        .add(Duration(days: daysUntilTuesday))
         .add(const Duration(hours: 23, minutes: 59, seconds: 59));
   }
 

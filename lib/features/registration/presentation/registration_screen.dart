@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import '../../../core/utils/aadhaar_validator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -654,7 +654,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                                     ),
                                   ),
                                   Text(
-                                    '${context.t('step')} ${_step + 1} ${context.t('of')} 4 · ${_stepTitles[_step]}',
+                                    '${context.t('step')} ${_step + 1} ${context.t('of')} 4 Â· ${_stepTitles[_step]}',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: AppTheme.textSecondary,
@@ -778,7 +778,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 }
 
-// ── Step 1: Basic Info ─────────────────────────────────────────────────────
+// â”€â”€ Step 1: Basic Info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _StepBasicInfo extends StatelessWidget {
   final TextEditingController nameCtrl;
@@ -923,7 +923,7 @@ class _StepBasicInfo extends StatelessWidget {
   );
 }
 
-// ── Step 2: Shop Details ──────────────────────────────────────────────────
+// â”€â”€ Step 2: Shop Details â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _StepShopDetails extends StatelessWidget {
   final TextEditingController shopNameCtrl,
@@ -1384,7 +1384,7 @@ class _StepShopDetails extends StatelessWidget {
   );
 }
 
-// ── Step 3: Scrap Categories ───────────────────────────────────────────────
+// â”€â”€ Step 3: Scrap Categories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _StepCategories extends StatelessWidget {
   final List<String> options;
@@ -1584,7 +1584,7 @@ class _StepCategories extends StatelessWidget {
   }
 }
 
-// ── Step 4: Vehicle & Hours ────────────────────────────────────────────────
+// â”€â”€ Step 4: Vehicle & Hours â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _StepVehicle extends StatelessWidget {
   final List<Map<String, dynamic>> vehicles;
@@ -1694,7 +1694,9 @@ class _StepVehicle extends StatelessWidget {
             );
           }),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
+
+          // â”€â”€ Working Hours Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Text(
             context.t('workingHoursLabel'),
             style: const TextStyle(
@@ -1703,41 +1705,194 @@ class _StepVehicle extends StatelessWidget {
               color: AppTheme.textPrimary,
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
+          const SizedBox(height: 4),
+          Text(
+            Localizations.localeOf(context).languageCode == 'hi'
+                ? 'à¤†à¤ª à¤•à¤¬ à¤‘à¤°à¥à¤¡à¤° à¤¸à¥à¤µà¥€à¤•à¤¾à¤° à¤•à¤° à¤¸à¤•à¤¤à¥‡ à¤¹à¥ˆà¤‚?'
+                : 'When are you available to accept orders?',
+            style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 14),
+
+          // Quick Preset Chips
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              Expanded(
-                child: _timeTile(
-                  context,
-                  context.t('opensAt') ?? 'Opens at',
-                  workStart,
-                  () async {
-                    final t = await showTimePicker(
-                      context: context,
-                      initialTime: workStart,
-                    );
-                    if (t != null) onStartTime(t);
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _timeTile(
-                  context,
-                  context.t('closesAt') ?? 'Closes at',
-                  workEnd,
-                  () async {
-                    final t = await showTimePicker(
-                      context: context,
-                      initialTime: workEnd,
-                    );
-                    if (t != null) onEndTime(t);
-                  },
-                ),
-              ),
+              _hoursPreset(context, 'ðŸŒ… Morning', const TimeOfDay(hour: 6, minute: 0), const TimeOfDay(hour: 14, minute: 0), workStart, workEnd, onStartTime, onEndTime),
+              _hoursPreset(context, 'â˜€ï¸ Day Shift', const TimeOfDay(hour: 9, minute: 0), const TimeOfDay(hour: 18, minute: 0), workStart, workEnd, onStartTime, onEndTime),
+              _hoursPreset(context, 'ðŸŒ† Evening', const TimeOfDay(hour: 14, minute: 0), const TimeOfDay(hour: 22, minute: 0), workStart, workEnd, onStartTime, onEndTime),
+              _hoursPreset(context, 'ðŸ•’ Full Day', const TimeOfDay(hour: 8, minute: 0), const TimeOfDay(hour: 20, minute: 0), workStart, workEnd, onStartTime, onEndTime),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
+
+          // Visual Schedule Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF064E3B), Color(0xFF059669)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primary.withOpacity(0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.access_time_rounded, color: Colors.white70, size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      Localizations.localeOf(context).languageCode == 'hi'
+                          ? 'à¤†à¤ªà¤•à¤¾ à¤•à¤¾à¤® à¤•à¤¾ à¤¸à¤®à¤¯'
+                          : 'Your Working Schedule',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    const Spacer(),
+                    // Duration badge
+                    Builder(builder: (ctx) {
+                      final startMins = workStart.hour * 60 + workStart.minute;
+                      final endMins = workEnd.hour * 60 + workEnd.minute;
+                      final dur = endMins > startMins ? endMins - startMins : (24 * 60 - startMins + endMins);
+                      final h = dur ~/ 60;
+                      final m = dur % 60;
+                      final label = m == 0 ? '${h}h' : '${h}h ${m}m';
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                      );
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    // START TIME
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final t = await showTimePicker(
+                            context: context,
+                            initialTime: workStart,
+                            helpText: Localizations.localeOf(context).languageCode == 'hi' ? 'à¤¶à¥à¤°à¥‚ à¤•à¤¾ à¤¸à¤®à¤¯' : 'Start Time',
+                          );
+                          if (t != null) onStartTime(t);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.wb_sunny_rounded, color: Colors.white70, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    Localizations.localeOf(context).languageCode == 'hi' ? 'à¤¶à¥à¤°à¥‚' : 'Starts',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                workStart.format(context),
+                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                Localizations.localeOf(context).languageCode == 'hi' ? 'à¤¬à¤¦à¤²à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤Ÿà¥ˆà¤ª à¤•à¤°à¥‡à¤‚' : 'Tap to change',
+                                style: const TextStyle(color: Colors.white54, fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Arrow
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.arrow_forward_rounded, color: Colors.white54, size: 20),
+                          const SizedBox(height: 2),
+                          Text(
+                            Localizations.localeOf(context).languageCode == 'hi' ? 'à¤¤à¤•' : 'to',
+                            style: const TextStyle(color: Colors.white54, fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // END TIME
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final t = await showTimePicker(
+                            context: context,
+                            initialTime: workEnd,
+                            helpText: Localizations.localeOf(context).languageCode == 'hi' ? 'à¤¬à¤‚à¤¦ à¤•à¤¾ à¤¸à¤®à¤¯' : 'End Time',
+                          );
+                          if (t != null) onEndTime(t);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.nights_stay_rounded, color: Colors.white70, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    Localizations.localeOf(context).languageCode == 'hi' ? 'à¤¬à¤‚à¤¦' : 'Ends',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                workEnd.format(context),
+                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                Localizations.localeOf(context).languageCode == 'hi' ? 'à¤¬à¤¦à¤²à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤Ÿà¥ˆà¤ª à¤•à¤°à¥‡à¤‚' : 'Tap to change',
+                                style: const TextStyle(color: Colors.white54, fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Info note
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -1770,63 +1925,45 @@ class _StepVehicle extends StatelessWidget {
     );
   }
 
-  Widget _timeTile(
+  // Helper: quick-select preset chip for working hours
+  Widget _hoursPreset(
     BuildContext context,
     String label,
-    TimeOfDay time,
-    VoidCallback onTap,
+    TimeOfDay presetStart,
+    TimeOfDay presetEnd,
+    TimeOfDay currentStart,
+    TimeOfDay currentEnd,
+    Function(TimeOfDay) onStartTime,
+    Function(TimeOfDay) onEndTime,
   ) {
+    final isSelected = currentStart.hour == presetStart.hour &&
+        currentStart.minute == presetStart.minute &&
+        currentEnd.hour == presetEnd.hour &&
+        currentEnd.minute == presetEnd.minute;
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+      onTap: () {
+        onStartTime(presetStart);
+        onEndTime(presetEnd);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.border, width: 1.5),
-          boxShadow: AppTheme.subtleShadow,
+          color: isSelected ? AppTheme.primary : Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: isSelected ? AppTheme.primary : AppTheme.border,
+            width: isSelected ? 2 : 1.5,
+          ),
+          boxShadow: isSelected ? AppTheme.subtleShadow : [],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.wb_sunny_rounded,
-                  color: AppTheme.textSecondary,
-                  size: 16,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  time.format(context),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const Icon(
-                  Icons.arrow_drop_down_rounded,
-                  color: AppTheme.primary,
-                  size: 24,
-                ),
-              ],
-            ),
-          ],
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: isSelected ? Colors.white : AppTheme.textSecondary,
+          ),
         ),
       ),
     );

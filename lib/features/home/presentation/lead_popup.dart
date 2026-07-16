@@ -229,6 +229,7 @@ class _LeadPopupState extends State<LeadPopup>
     _responded = true;
     _timer.cancel();
     _stopAlert();
+    _writeDeclinedToFirebase(); // persist decline so order won't reappear
     widget.onDeclined();
     Navigator.pop(context);
   }
@@ -236,8 +237,22 @@ class _LeadPopupState extends State<LeadPopup>
   void _autoDecline() {
     _timer.cancel();
     _stopAlert();
+    _writeDeclinedToFirebase(); // persist auto-decline (timeout)
     widget.onDeclined();
     Navigator.pop(context);
+  }
+
+  /// Write declinedPartners.$uid = current tipAmount to Firestore.
+  /// This ensures the order doesn't re-show to this partner on any device or
+  /// after app restart — unless the customer increases the tip amount.
+  void _writeDeclinedToFirebase() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    FirebaseFirestore.instance
+        .collection('orders')
+        .doc(widget.order.orderId)
+        .update({'declinedPartners.$uid': widget.order.tipAmount})
+        .catchError((_) {}); // best-effort, non-blocking
   }
 
   double get _progress => _secondsLeft / 120.0;

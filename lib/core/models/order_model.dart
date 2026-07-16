@@ -121,7 +121,12 @@ class OrderModel {
     this.declinedPartners = const {},
     this.tipAmount = 0.0,
     this.pickupCharge = 0.0,
+    this.scheduledDateTimestamp,
   });
+
+  /// Firestore scheduledDate Timestamp (if set directly by customer app)
+  /// Used as the authoritative source for scheduled pickup time when present.
+  final DateTime? scheduledDateTimestamp;
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     return OrderModel(
@@ -137,9 +142,7 @@ class OrderModel {
       scrapItems: (json['scrapItems'] as List<dynamic>? ?? [])
           .map((e) => ScrapItem.fromJson(e as Map<String, dynamic>))
           .toList(),
-      // Support flat scrapCategories array (used by simpler customer app orders)
       rawScrapCategories: List<String>.from(json['scrapCategories'] ?? []),
-      // Support top-level estimatedWeight (used by simpler customer app orders)
       rawEstimatedWeight: (json['estimatedWeight'] ?? 0.0).toDouble(),
       imageUrls: List<String>.from(json['imageUrls'] ?? []),
       customerNotes: json['customerNotes'],
@@ -161,7 +164,6 @@ class OrderModel {
       cancelledAt: (json['cancelledAt'] as Timestamp?)?.toDate() ?? (json['status'] == 'cancelled' ? (json['updatedAt'] as Timestamp?)?.toDate() : null),
       expiresAt: (json['expiresAt'] as Timestamp?)?.toDate(),
       pickupOtp: json['otp']?.toString() ?? json['pickupOtp']?.toString() ?? '',
-      // Support both pickupType and orderType fields from different app versions
       pickupType: json['pickupType'] ?? json['orderType'] ?? 'instant',
       reservedPartnerId: json['reservedPartnerId'],
       declinedPartners: Map<String, double>.from(
@@ -171,6 +173,11 @@ class OrderModel {
       ),
       tipAmount: (json['tipAmount'] ?? 0.0).toDouble(),
       pickupCharge: (json['pickupCharge'] ?? 0.0).toDouble(),
+      // Try multiple Firestore field names for the scheduled timestamp
+      scheduledDateTimestamp:
+          (json['scheduledDate'] as Timestamp?)?.toDate() ??
+          (json['scheduledAt'] as Timestamp?)?.toDate() ??
+          (json['scheduledTime'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -246,6 +253,7 @@ class OrderModel {
     Map<String, double>? declinedPartners,
     double? tipAmount,
     double? pickupCharge,
+    DateTime? scheduledDateTimestamp,
   }) {
     return OrderModel(
       orderId: orderId ?? this.orderId,
@@ -282,6 +290,7 @@ class OrderModel {
       declinedPartners: declinedPartners ?? this.declinedPartners,
       tipAmount: tipAmount ?? this.tipAmount,
       pickupCharge: pickupCharge ?? this.pickupCharge,
+      scheduledDateTimestamp: scheduledDateTimestamp ?? this.scheduledDateTimestamp,
     );
   }
 
@@ -291,41 +300,98 @@ class OrderModel {
         OrderStatus.pickupStarted,
       ].contains(status);
 
+  /// Parses the scheduled pickup time from multiple possible sources.
+  ///
+  /// Priority order:
+  ///   1. `scheduledDateTimestamp` — a real Firestore Timestamp field (most reliable)
+  ///   2. `pickupSlot` string — e.g. "today, 3PM-6PM" or "Today 3pm to 6pm"
+  ///   3. Fallback: `createdAt + 1 hour` (never go to "tomorrow" by default)
   DateTime get scheduledDateTime {
-    final defaultDate = createdAt.add(const Duration(days: 1));
-    try {
-      if (pickupSlot.isEmpty) return defaultDate;
-      final parts = pickupSlot.split(',');
-      final dateStr = parts[0].trim().toLowerCase();
-      DateTime date;
-      if (dateStr == 'tomorrow') {
-        final now = DateTime.now();
-        date = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
-      } else if (dateStr == 'today') {
-        final now = DateTime.now();
-        date = DateTime(now.year, now.month, now.day);
-      } else {
-        date = DateTime.parse(dateStr);
-      }
-      if (parts.length > 1) {
-        final timeStr = parts[1].trim().toUpperCase();
-        final startHourStr = timeStr.split('-')[0].trim();
-        final match = RegExp(r'(\d+)\s*(AM|PM)').firstMatch(startHourStr);
-        if (match != null) {
-          int hour = int.parse(match.group(1)!);
-          final amPm = match.group(2);
-          if (amPm == 'PM' && hour < 12) {
-            hour += 12;
-          } else if (amPm == 'AM' && hour == 12) {
-            hour = 0;
+    // ── Source 1: direct Firestore Timestamp ──────────────────────────────────
+    if (scheduledDateTimestamp != null) return scheduledDateTimestamp!;
+
+    // ── Source 2: parse pickupSlot string ────────────────────────────────────
+    // Handles all known formats:
+    //   "today, 3PM-6PM"       standard comma format
+    //   "Today 3pm to 6pm"     no comma, space-separated, "to" separator
+    //   "tomorrow, 9AM-12PM"   tomorrow
+    //   "2026-07-17, 3PM-6PM"  ISO date format
+    if (pickupSlot.isNotEmpty) {
+      try {
+        // Normalize: remove leading/trailing whitespace, collapse multiple spaces
+        final raw = pickupSlot.trim();
+
+        // Split date part from time part.
+        // Accept comma OR (space before a digit/time token) as separators.
+        // Pattern: split on first comma if present, else split on first numeric time token.
+        String dateStr;
+        String? timeStr;
+
+        if (raw.contains(',')) {
+          final commaIdx = raw.indexOf(',');
+          dateStr = raw.substring(0, commaIdx).trim().toLowerCase();
+          timeStr = raw.substring(commaIdx + 1).trim().toUpperCase();
+        } else {
+          // No comma — match 'today', 'tomorrow', or ISO date at start
+          final noCommaMatch = RegExp(
+            r'^(today|tomorrow|\d{4}-\d{2}-\d{2})\s+(.+)',
+            caseSensitive: false,
+          ).firstMatch(raw);
+          if (noCommaMatch != null) {
+            dateStr = noCommaMatch.group(1)!.trim().toLowerCase();
+            timeStr = noCommaMatch.group(2)!.trim().toUpperCase();
+          } else {
+            dateStr = raw.toLowerCase();
           }
-          return DateTime(date.year, date.month, date.day, hour);
         }
+
+        // Parse the date part
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        DateTime date;
+        if (dateStr == 'today') {
+          date = today;
+        } else if (dateStr == 'tomorrow') {
+          date = today.add(const Duration(days: 1));
+        } else {
+          date = DateTime.parse(dateStr);
+        }
+
+        // Parse the time part — find first hour in "3PM", "3pm", "3:00PM", "15"
+        // Accept both "-" and " to " as range separators
+        if (timeStr != null && timeStr.isNotEmpty) {
+          // Replace " TO " with "-" so we can split uniformly
+          final normalizedTime = timeStr.replaceAll(RegExp(r'\s+TO\s+'), '-');
+          // Take the start of the range only
+          final startPart = normalizedTime.split('-').first.trim();
+          // Match hour with optional minutes and AM/PM
+          final match = RegExp(r'(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?').firstMatch(startPart);
+          if (match != null) {
+            int hour = int.parse(match.group(1)!);
+            final minute = int.tryParse(match.group(2) ?? '0') ?? 0;
+            final amPm = match.group(3);
+            if (amPm == 'PM' && hour < 12) hour += 12;
+            if (amPm == 'AM' && hour == 12) hour = 0;
+            // If no AM/PM and hour <= 12, try to detect PM context
+            // (e.g. "3" in "3-6PM" should be PM)
+            if (amPm == null && hour < 12) {
+              // Check if the whole time string contains PM anywhere
+              if (timeStr.contains('PM')) hour += 12;
+            }
+            return DateTime(date.year, date.month, date.day, hour, minute);
+          }
+          // No time found — use noon as default for that date
+          return DateTime(date.year, date.month, date.day, 12);
+        }
+        return DateTime(date.year, date.month, date.day, 12);
+      } catch (_) {
+        // fall through to fallback
       }
-      return DateTime(date.year, date.month, date.day, 12);
-    } catch (_) {
-      return defaultDate;
     }
+
+    // ── Fallback: createdAt + 1 hour (NEVER jump to tomorrow by default) ─────
+    // The old default was createdAt + 24h which caused the "pickup in 24h" bug.
+    return createdAt.add(const Duration(hours: 1));
   }
 
   /// Returns total estimated weight. Prefers scrapItems sum; falls back to

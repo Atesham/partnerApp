@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -88,7 +89,20 @@ class _WeighingScreenState extends State<WeighingScreen> {
 
   // Commission = 2% of total payout
   double get _commission => _totalPayout * 0.02;
-  double get _paidToCustomer => _totalPayout - _commission - widget.order.tipAmount - widget.order.pickupCharge;
+
+  // Pickup charge is waived (₹0) when final payout >= ₹100; otherwise ₹30 is applied.
+  // If the order originally had a pickup charge set, use that; else default to ₹30.
+  static const double _pickupChargeThreshold = 100.0;
+  static const double _defaultPickupCharge = 30.0;
+  double get _effectivePickupCharge {
+    if (_totalPayout >= _pickupChargeThreshold) return 0.0;
+    // Below threshold: use order's original charge, or ₹30 if none was set
+    final base = widget.order.pickupCharge > 0 ? widget.order.pickupCharge : _defaultPickupCharge;
+    return base;
+  }
+
+  // paidToCustomer is always >= 0 (never show negative)
+  double get _paidToCustomer => max(0, _totalPayout - _commission - widget.order.tipAmount - _effectivePickupCharge);
 
   Future<void> _submit() async {
     if (_weighingPhoto == null) {
@@ -116,6 +130,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
     final ok = await _orders.submitFinalPricing(
       widget.order.orderId, items, _totalPayout,
       weighingPhotoUrl: photoUrl,
+      effectivePickupCharge: _effectivePickupCharge,
     );
 
     if (!mounted) return;
@@ -131,6 +146,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
             payout: _totalPayout,
             commission: _commission,
             paidToCustomer: _paidToCustomer,
+            effectivePickupCharge: _effectivePickupCharge,
             entries: _entries,
           ),
         ),
@@ -230,7 +246,7 @@ class _WeighingScreenState extends State<WeighingScreen> {
                               _billingRow('${context.t('totalPayout')}', '₹${_totalPayout.toStringAsFixed(0)}', isBold: false),
                               const SizedBox(height: 6),
                               // Commission
-                              _billingRow('${context.t('commissionLabel')}', '− ₹${_commission.toStringAsFixed(0)}', color: Colors.orange.shade200),
+                               _billingRow('${context.t('commissionLabel')}', '− ₹${_commission.toStringAsFixed(0)}', color: Colors.orange.shade200),
                               if (widget.order.tipAmount > 0) ...[
                                 const SizedBox(height: 6),
                                 _billingRow(
@@ -239,12 +255,21 @@ class _WeighingScreenState extends State<WeighingScreen> {
                                   color: Colors.green.shade200
                                 ),
                               ],
-                              if (widget.order.pickupCharge > 0) ...[
+                              // Show pickup charge only if still applicable (payout < ₹100)
+                              if (_effectivePickupCharge > 0) ...[
                                 const SizedBox(height: 6),
                                 _billingRow(
                                   Localizations.localeOf(context).languageCode == 'hi' ? 'पिकअप चार्ज' : 'Pickup Charge', 
-                                  '− ₹${widget.order.pickupCharge.toStringAsFixed(0)}', 
+                                  '− ₹${_effectivePickupCharge.toStringAsFixed(0)}', 
                                   color: Colors.blue.shade200
+                                ),
+                              ] else if (widget.order.pickupCharge > 0) ...[
+                                // Pickup charge was waived because payout >= ₹100
+                                const SizedBox(height: 6),
+                                _billingRow(
+                                  Localizations.localeOf(context).languageCode == 'hi' ? 'पिकअप चार्ज (माफ)' : 'Pickup Charge (Waived)', 
+                                  '₹0', 
+                                  color: Colors.green.shade200
                                 ),
                               ],
                               const Padding(
@@ -556,12 +581,14 @@ class _FinalConfirmationScreen extends StatefulWidget {
   final double payout;
   final double commission;
   final double paidToCustomer;
+  final double effectivePickupCharge;
   final List<_WeighingEntry> entries;
   const _FinalConfirmationScreen({
     required this.order,
     required this.payout,
     required this.commission,
     required this.paidToCustomer,
+    required this.effectivePickupCharge,
     required this.entries,
   });
 
@@ -599,7 +626,8 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
 
   @override
   Widget build(BuildContext context) {
-    final yourEarnings = widget.payout - widget.commission + widget.order.tipAmount + widget.order.pickupCharge;
+    // Earnings: payout minus commission, plus tip (partner keeps tip) and pickup charge (partner keeps pickup fee)
+    final yourEarnings = widget.payout - widget.commission + widget.order.tipAmount + widget.effectivePickupCharge;
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
@@ -705,12 +733,19 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
                         valueColor: Colors.green.shade200
                       ),
                     ],
-                    if (widget.order.pickupCharge > 0) ...[
+                    if (widget.effectivePickupCharge > 0) ...[
                       const SizedBox(height: 6),
                       _summaryRow(
                         Localizations.localeOf(context).languageCode == 'hi' ? 'पिकअप चार्ज' : 'Pickup Charge', 
-                        '− ₹${widget.order.pickupCharge.toStringAsFixed(0)}', 
+                        '− ₹${widget.effectivePickupCharge.toStringAsFixed(0)}', 
                         valueColor: Colors.blue.shade200
+                      ),
+                    ] else if (widget.order.pickupCharge > 0) ...[
+                      const SizedBox(height: 6),
+                      _summaryRow(
+                        Localizations.localeOf(context).languageCode == 'hi' ? 'पिकअप चार्ज (माफ)' : 'Pickup Charge (Waived)', 
+                        '₹0 ✓', 
+                        valueColor: Colors.green.shade300
                       ),
                     ],
                     const Padding(
@@ -721,7 +756,7 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(context.t('paidToCustomer'), style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
-                        Text('₹${widget.paidToCustomer.toStringAsFixed(0)}',
+                        Text('₹${max(0, widget.paidToCustomer).toStringAsFixed(0)}',
                           style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
                       ],
                     ),
