@@ -444,7 +444,8 @@ class EarningsProvider extends ChangeNotifier {
   bool get shouldBlockForCommission =>
       hasCommissionDue &&
       (_commissionBlocked ||
-       _commissionDueBalance >= 500 ||
+       // commissionDueAt returns DateTime.now()-1s when balance >= 500 (immediate block)
+       // and returns next Tuesday EOD otherwise — so isAfter() handles both cases.
        (commissionDueAt != null && DateTime.now().isAfter(commissionDueAt!)));
   bool get isLoading => _isLoading;
 

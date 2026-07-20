@@ -752,4 +752,104 @@ const Map<String, String> stringsHi = {
   'payoutToCustomer': 'Customer को मिलने वाला Payment',
   'extraTipForYou': '🎉 आपके लिए Extra Tip',
   'pickupSlotLabel': 'Pickup Time',
+
+  // ── Order Detail Screen ────────────────────────────────────────────────────
+  'orderDetailTitle': 'Order की जानकारी',
+
+  // Status banner
+  'statusCompleted': 'पूरा हुआ',
+  'statusCancelled': 'Cancel हुआ',
+  'statusCompletedSub': 'Pickup सफलतापूर्वक पूरी हो गई',
+  'statusCancelledSub': 'यह Order Cancel कर दिया गया था',
+
+  // Metadata card
+  'orderId': 'Order ID',
+  'dateAndTime': 'तारीख और समय',
+  'payment': 'भुगतान',
+  'paymentOnline': 'Online',
+  'scheduledPickupBadge': 'Scheduled Pickup',
+  'instantPickupBadge': 'Instant Pickup',
+  'dateToday': 'आज',
+  'dateYesterday': 'कल',
+
+  // Customer card
+  'customerDetailsTitle': 'Customer की जानकारी',
+  'viewOnMap': 'Map पर देखें',
+
+  // Pickup items card
+  'pickupItemsTitle': 'Pickup Items',
+  'itemCountSingular': '1 item',
+  'noScrapMaterialsListed': 'कोई Scrap item नहीं जोड़ा गया',
+  'estWeightLabel': 'अनुमानित वजन',
+  'scrapAmountLabel': 'Scrap की रकम',
+  'estScrapAmountLabel': 'अनुमानित Scrap रकम',
+  'tipAmountLabel': 'Tip की रकम',
+  'pickupChargeLabel': 'Pickup Charge',
+  'totalAmountLabel': 'कुल रकम',
+
+  // Cancellation details card
+  'cancellationDetailsTitle': 'Cancellation की जानकारी',
+  'cancelledByLabel': 'Cancel किसने किया',
+  'cancelledByCustomer': 'Customer ने',
+  'cancelledByYou': 'आपने',
+  'cancelReasonLabel': 'कारण',
+  'cancelReasonNotSpecified': 'नहीं बताया',
+  'cancelledAtLabel': 'Cancel का समय',
+
+  // Timeline card
+  'orderTimelineTitle': 'Order का सफर',
+  'timelineOrderReceived': 'Order मिला',
+  'timelineYouAccepted': 'आपने Order Accept किया',
+  'timelineReachedCustomer': 'Customer के पास पहुंचे',
+  'timelinePickupCompleted': 'Pickup पूरी हुई',
+  'timelinePaymentReceived': 'Payment मिली',
+  'timelineCancelled': 'Cancel हुआ',
+
+  // Earnings card (completed)
+  'earningsTitle': 'आपकी कमाई',
+  'scrapAmountEarned': 'Scrap की रकम',
+  'platformFeeLabel': 'Platform Fee (2%)',
+  'tipEarnedLabel': 'Tip मिली',
+  'pickupChargeEarnedLabel': 'Pickup Charge से कमाई',
+  'youEarnedLabel': 'आपकी कुल कमाई',
+
+  // Total loss card (cancelled)
+  'totalLossTitle': 'कोई कमाई नहीं',
+  'noEarningsFromOrder': 'इस Order से कोई कमाई नहीं हुई।',
+  'lostAmountLabel': 'रकम',
+
+  // Help button
+  'helpSupportBtn': 'मदद / Support',
+
+  // Payment instructions screen
+  'payCustomerTitle': 'Customer ko Pay Karein',
+  'payCustomerTitleSub': 'Payment karke order complete karein',
+  'secureLabel': 'Secure',
+  'payAmountLabel': 'Customer ko dene yogya amount',
+  'paymentMotivation': 'Imaandari se diya gaya payment, agla order pakka banata hai! 💚',
+  'orderSummaryTitle': 'Order Summary',
+  'totalWeightLabel': 'Kul Vajan',
+  'scrapTypeLabel': 'Scrap Ka Prakar',
+  'rateLabel': 'Dar',
+  'paymentInstructions': 'Payment Kaise Karein',
+  'paymentInstructionsSub': 'Customer ko turant payment karne ke liye koi bhi tarika chunein.',
+  'paymentMethodTitle': 'Payment Ka Tarika',
+  'upiTransferLabel': 'UPI Transfer',
+  'cashPaymentLabel': 'Naqd Bhugtan',
+  'payOptionQr': 'UPI / QR Code (Sujhaya Gaya)',
+  'payOptionQrDesc': 'Customer se unka GPay, PhonePe ya Paytm QR Code dikhane ko kahein aur scan karein.',
+  'payOptionCash': 'Cash Payment (Nakad)',
+  'payOptionCashDesc': 'Customer ko seedha cash (nakad) mein sahi rakam dein.',
+  'customerPhoneLabel': 'Customer Ka Mobile Number',
+  'customerDetailsTitle2': 'Customer Ki Jankari',
+  'callLabel': 'Call Karein',
+  'whatsAppLabel': 'WhatsApp',
+  'paymentTipBanner': 'Payment dene ke baad hi "Payment Confirmed" karke order complete karein.',
+  'ctaButtonLabel': 'Maine Customer ko \u20B9{amount} Pay Kar Diya',
+  'ctaSubCaption': 'Payment confirm hote hi order complete ho jayega',
+  'confirmPaymentButton': 'Maine Payment Kar Diya Hai',
+  'copyNumber': 'Number Copy Karein',
+  'copiedSnack': 'Mobile number copy ho gaya hai',
+  'mixedScrapLabel': 'Milit Scrap',
+  'paymentSavedSnack': 'Payment tarika save ho gaya',
 };

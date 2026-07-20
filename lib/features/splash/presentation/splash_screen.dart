@@ -43,19 +43,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
       if (!mounted) return;
 
+      // Check for Play Store update BEFORE navigating — the splash context
+      // is still alive here so the immediate-update dialog can display correctly.
+      // This is fire-and-forget: if no update is available it completes instantly.
+      await InAppUpdateService.instance.checkForUpdate(context);
+
+      if (!mounted) return;
+
       final route = results[1];
       if (route is Widget) {
         _push(route);
-
-        // After navigating, trigger an in-app update check in the background.
-        // The check is fire-and-forget: it won't block or delay navigation.
-        // If an update is available, the Play Store downloads it silently and
-        // a snackbar appears on the new screen prompting the user to restart.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            InAppUpdateService.instance.checkForUpdate(context);
-          }
-        });
       }
     } catch (e) {
       if (mounted) {

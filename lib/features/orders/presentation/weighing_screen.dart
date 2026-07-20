@@ -11,6 +11,8 @@ import '../../../core/widgets/shared_widgets.dart';
 import '../../../core/services/supabase_storage_service.dart';
 import '../../../core/l10n/app_localizations.dart';
 import '../../main/presentation/main_screen.dart';
+import 'payment_instructions_screen.dart';
+
 
 
 class WeighingScreen extends StatefulWidget {
@@ -102,7 +104,9 @@ class _WeighingScreenState extends State<WeighingScreen> {
   }
 
   // paidToCustomer is always >= 0 (never show negative)
-  double get _paidToCustomer => max(0, _totalPayout - _commission - widget.order.tipAmount - _effectivePickupCharge);
+  // Commission is the PARTNER's cost paid to Scrapwell — it does NOT reduce what the customer receives.
+  // Only tip and pickup charge are deducted from the customer's payout (they are collected on behalf of Scrapwell/partner).
+  double get _paidToCustomer => max(0, _totalPayout - widget.order.tipAmount - _effectivePickupCharge);
 
   Future<void> _submit() async {
     if (_weighingPhoto == null) {
@@ -141,13 +145,24 @@ class _WeighingScreenState extends State<WeighingScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => _FinalConfirmationScreen(
+          builder: (_) => PaymentInstructionsScreen(
             order: updated,
-            payout: _totalPayout,
-            commission: _commission,
             paidToCustomer: _paidToCustomer,
-            effectivePickupCharge: _effectivePickupCharge,
-            entries: _entries,
+            onPaymentConfirmed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => _FinalConfirmationScreen(
+                    order: updated,
+                    payout: _totalPayout,
+                    commission: _commission,
+                    paidToCustomer: _paidToCustomer,
+                    effectivePickupCharge: _effectivePickupCharge,
+                    entries: _entries,
+                  ),
+                ),
+              );
+            },
           ),
         ),
       );
@@ -626,8 +641,9 @@ class _FinalConfirmationScreenState extends State<_FinalConfirmationScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Earnings: payout minus commission, plus tip (partner keeps tip) and pickup charge (partner keeps pickup fee)
-    final yourEarnings = widget.payout - widget.commission + widget.order.tipAmount + widget.effectivePickupCharge;
+    // Partner's earnings: scrap payout minus the 2% commission they owe to Scrapwell.
+    // Tip and pickup charge are already factored into paidToCustomer deductions — they are NOT additional partner income.
+    final yourEarnings = widget.payout - widget.commission;
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(

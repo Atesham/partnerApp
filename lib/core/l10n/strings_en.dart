@@ -446,5 +446,105 @@ const Map<String, String> stringsEn = {
   'payoutToCustomer': 'Payout to Customer',
   'extraTipForYou': 'Extra Tip for You',
   'pickupSlotLabel': 'Pickup Slot',
+
+  // ── Order Detail Screen ────────────────────────────────────────────────────
+  'orderDetailTitle': 'Order Details',
+
+  // Status banner
+  'statusCompleted': 'Completed',
+  'statusCancelled': 'Cancelled',
+  'statusCompletedSub': 'Pickup completed successfully',
+  'statusCancelledSub': 'This order was cancelled',
+
+  // Metadata card
+  'orderId': 'Order ID',
+  'dateAndTime': 'Date & Time',
+  'payment': 'Payment',
+  'paymentOnline': 'Online',
+  'scheduledPickupBadge': 'Scheduled Pickup',
+  'instantPickupBadge': 'Instant Pickup',
+  'dateToday': 'Today',
+  'dateYesterday': 'Yesterday',
+
+  // Customer card
+  'customerDetailsTitle': 'Customer Details',
+  'viewOnMap': 'View on Map',
+
+  // Pickup items card
+  'pickupItemsTitle': 'Pickup Items',
+  'itemCountSingular': '1 item',
+  'noScrapMaterialsListed': 'No scrap materials listed',
+  'estWeightLabel': 'Est. weight',
+  'scrapAmountLabel': 'Scrap Amount',
+  'estScrapAmountLabel': 'Est. Scrap Amount',
+  'tipAmountLabel': 'Tip Amount',
+  'pickupChargeLabel': 'Pickup Charge',
+  'totalAmountLabel': 'Total Amount',
+
+  // Cancellation details card
+  'cancellationDetailsTitle': 'Cancellation Details',
+  'cancelledByLabel': 'Cancelled by',
+  'cancelledByCustomer': 'Customer',
+  'cancelledByYou': 'You',
+  'cancelReasonLabel': 'Reason',
+  'cancelReasonNotSpecified': 'Not specified',
+  'cancelledAtLabel': 'Cancelled at',
+
+  // Timeline card
+  'orderTimelineTitle': 'Order Timeline',
+  'timelineOrderReceived': 'Order received',
+  'timelineYouAccepted': 'You accepted the order',
+  'timelineReachedCustomer': 'Reached at customer',
+  'timelinePickupCompleted': 'Pickup completed',
+  'timelinePaymentReceived': 'Payment received',
+  'timelineCancelled': 'Cancelled',
+
+  // Earnings card (completed)
+  'earningsTitle': 'Earnings',
+  'scrapAmountEarned': 'Scrap Amount',
+  'platformFeeLabel': 'Platform Fee (2%)',
+  'tipEarnedLabel': 'Tip Earned',
+  'pickupChargeEarnedLabel': 'Pickup Charge Earned',
+  'youEarnedLabel': 'You Earned',
+
+  // Total loss card (cancelled)
+  'totalLossTitle': 'Total Loss',
+  'noEarningsFromOrder': 'No earnings were generated from this order.',
+  'lostAmountLabel': 'Amount',
+
+  // Help button
+  'helpSupportBtn': 'Help / Support',
+
+  // Payment instructions screen
+  'payCustomerTitle': 'Customer ko Pay Karein',
+  'payCustomerTitleSub': 'Payment karke order complete karein',
+  'secureLabel': 'Secure',
+  'payAmountLabel': 'Customer ko dene yogya amount',
+  'paymentMotivation': 'Honest payment ensures your next order! 💚',
+  'orderSummaryTitle': 'Order Summary',
+  'totalWeightLabel': 'Total Weight',
+  'scrapTypeLabel': 'Scrap Type',
+  'rateLabel': 'Rate',
+  'paymentInstructions': 'How to Pay',
+  'paymentInstructionsSub': 'Choose any method to pay the customer immediately.',
+  'paymentMethodTitle': 'Payment Method',
+  'upiTransferLabel': 'UPI Transfer',
+  'cashPaymentLabel': 'Cash Payment',
+  'payOptionQr': 'UPI / QR Code (Recommended)',
+  'payOptionQrDesc': 'Ask the customer to show their GPay, PhonePe, or Paytm QR code and scan it.',
+  'payOptionCash': 'Cash Payment',
+  'payOptionCashDesc': 'Pay the exact cash amount directly to the customer.',
+  'customerPhoneLabel': 'Customer Number',
+  'customerDetailsTitle2': 'Customer Details',
+  'callLabel': 'Call',
+  'whatsAppLabel': 'WhatsApp',
+  'paymentTipBanner': 'Only mark "Payment Confirmed" after paying the customer.',
+  'ctaButtonLabel': 'Maine Customer ko \u20B9{amount} Pay Kar Diya',
+  'ctaSubCaption': 'Order will be completed once payment is confirmed',
+  'confirmPaymentButton': 'I Have Paid the Customer',
+  'copyNumber': 'Copy Number',
+  'copiedSnack': 'Phone number copied to clipboard',
+  'mixedScrapLabel': 'Mixed Scrap',
+  'paymentSavedSnack': 'Payment method saved',
 };
 

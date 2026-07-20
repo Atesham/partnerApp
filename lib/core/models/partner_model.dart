@@ -447,8 +447,13 @@ class PartnerModel {
       dynamicCommissionDueAt != null &&
       DateTime.now().isAfter(dynamicCommissionDueAt!);
 
+  // Only block if:
+  //  1. The partner manually flagged as commissionBlocked in Firestore (admin action), OR
+  //  2. The commission due date has passed (dynamicCommissionDueAt already handles ≥₹500 limit
+  //     by returning a past timestamp — so isCommissionOverdue fires for those too)
+  // This ensures an order picked up on Saturday is NOT blocked until Tuesday EOD.
   bool get shouldBlockForCommission =>
-      hasCommissionDue && (commissionBlocked || isCommissionOverLimit || isCommissionOverdue);
+      hasCommissionDue && (commissionBlocked || isCommissionOverdue);
   String get displayName => fullName.isNotEmpty ? fullName : 'Partner';
   String get initials {
     final parts = fullName.trim().split(' ');
